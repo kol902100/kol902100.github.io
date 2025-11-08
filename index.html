@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tellonym Answer Scraper</title>
+    <style>
+        :root {
+  /* Primitive Color Tokens */
+  --color-white: rgba(255, 255, 255, 1);
+  --color-black: rgba(0, 0, 0, 1);
+  --color-cream-50: rgba(252, 252, 249, 1);
+  --color-cream-100: rgba(255, 255, 253, 1);
+  --color-gray-200: rgba(245, 245, 245, 1);
+  --color-gray-300: rgba(167, 169, 169, 1);
+  --color-gray-400: rgba(119, 124, 124, 1);
+  --color-slate-500: rgba(98, 108, 113, 1);
+  --color-brown-600: rgba(94, 82, 64, 1);
+  --color-charcoal-700: rgba(31, 33, 33, 1);
+  --color-charcoal-800: rgba(38, 40, 40, 1);
+  --color-slate-900: rgba(19, 52, 59, 1);
+  --color-teal-300: rgba(50, 184, 198, 1);
+  --color-teal-400: rgba(45, 166, 178, 1);
+  --color-teal-500: rgba(33, 128, 141, 1);
+  --color-teal-600: rgba(29, 116, 128, 1);
+  --color-teal-700: rgba(26, 104, 115, 1);
+  --color-teal-800: rgba(41, 150, 161, 1);
+  --color-red-400: rgba(255, 84, 89, 1);
+  --color-red-500: rgba(192, 21, 47, 1);
+  --color-orange-400: rgba(230, 129, 97, 1);
+  --color-orange-500: rgba(168, 75, 47, 1);
+
+  /* RGB versions for opacity control */
+  --color-brown-600-rgb: 94, 82, 64;
+  --color-teal-500-rgb: 33, 128, 141;
+  --color-slate-900-rgb: 19, 52, 59;
+  --color-slate-500-rgb: 98, 108, 113;
+  --color-red-500-rgb: 192, 21, 47;
+  --color-red-400-rgb: 255, 84, 89;
+  --color-orange-500-rgb: 168, 75, 47;
+  --color-orange-400-rgb: 230, 129, 97;
+
+  /* Background color tokens (Light Mode) */
+  --color-bg-1: rgba(59, 130, 246, 0.08);
+  --color-bg-2: rgba(245, 158, 11, 0.08);
+  --color-bg-3: rgba(34, 197, 94, 0.08);
+  --color-bg-4: rgba(239, 68, 68, 0.08);
+  --color-bg-5: rgba(147, 51, 234, 0.08);
+  --color-bg-6: rgba(249, 115, 22, 0.08);
+  --color-bg-7: rgba(236, 72, 153, 0.08);
+  --color-bg-8: rgba(6, 182, 212, 0.08);
+
+  /* Semantic Color Tokens (Light Mode) */
+  --color-background: var(--color-cream-50);
+  --color-surface: var(--color-cream-100);
+  --color-text: var(--color-slate-900);
+  --color-text-secondary: var(--color-slate-500);
+  --color-primary: var(--color-teal-500);
+  --color-primary-hover: var(--color-teal-600);
+  --color-primary-active: var(--color-teal-700);
+  --color-secondary: rgba(var(--color-brown-600-rgb), 0.12);
+  --color-secondary-hover: rgba(var(--color-brown-600-rgb), 0.2);
+  --color-secondary-active: rgba(var(--color-brown-600-rgb), 0.25);
+  --color-border: rgba(var(--color-brown-600-rgb), 0.2);
+  --color-btn-primary-text: var(--color-cream-50);
+  --color-card-border: rgba(var(--color-brown-600-rgb), 0.12);
+  --color-card-border-inner: rgba(var(--color-brown-600-rgb), 0.12);
+  --color-error: var(--color-red-500);
+  --color-success: var(--color-teal-500);
+  --color-warning: var(--color-orange-500);
+  --color-info: var(--color-slate-500);
+  --color-focus-ring: rgba(var(--color-teal-500-rgb), 0.4);
+  --color-select-caret: rgba(var(--color-slate-900-rgb), 0.8);
+
+  /* Common style patterns */
+  --focus-ring: 0 0 0 3px var(--color-focus-ring);
+  --focus-outline: 2px solid var(--color-primary);
+  --status-bg-opacity: 0.15;
+  --status-border-opacity: 0.25;
+  --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23134252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  --select-caret-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+
+  /* RGB versions for opacity control */
+  --color-success-rgb: 33, 128, 141;
+  --color-error-rgb: 192, 21, 47;
+  --color-warning-rgb: 168, 75, 47;
+  --color-info-rgb: 98, 108, 113;
+
+  /* Typography */
+  --font-family-base: "FKGroteskNeue", "Geist", "Inter", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 24px;
+  --font-size-4xl: 30px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 550;
+  --font-weight-bold: 600;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --letter-spacing-tight: -0.01em;
+
+  /* Spacing */
+  --space-0: 0;
+  --space-1: 1px;
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-base: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04),
+    0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04),
+    0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+
+  /* Animation */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layout */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+}
+
+/* Dark mode colors */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* RGB versions for opacity control (Dark Mode) */
+    --color-gray-400-rgb: 119, 124, 124;
+    --color-teal-300-rgb: 50, 184, 198;
+    --color-gray-300-rgb: 167, 169, 169;
+    --color-gray-200-rgb: 245, 245, 245;
+
+    /* Background color tokens (Dark Mode) */
+    --color-bg-1: rgba(29, 78, 216, 0.15);
+    --color-bg-2: rgba(180, 83, 9, 0.15);
+    --color-bg-3: rgba(21, 128, 61, 0.15);
+    --color-bg-4: rgba(185, 28, 28, 0.15);
+    --color-bg-5: rgba(107, 33, 168, 0.15);
+    --color-bg-6: rgba(194, 65, 12, 0.15);
+    --color-bg-7: rgba(190, 24, 93, 0.15);
+    --color-bg-8: rgba(8, 145, 178, 0.15);
+
+    /* Semantic Color Tokens (Dark Mode) */
+    --color-background: var(--color-charcoal-700);
+    --color-surface: var(--color-charcoal-800);
+    --color-text: var(--color-gray-200);
+    --color-text-secondary: rgba(var(--color-gray-300-rgb), 0.7);
+    --color-primary: var(--color-teal-300);
+    --color-primary-hover: var(--color-teal-400);
+    --color-primary-active: var(--color-teal-800);
+    --color-secondary: rgba(var(--color-gray-400-rgb), 0.15);
+    --color-secondary-hover: rgba(var(--color-gray-400-rgb), 0.25);
+    --color-secondary-active: rgba(var(--color-gray-400-rgb), 0.3);
+    --color-border: rgba(var(--color-gray-400-rgb), 0.3);
+    --color-error: var(--color-red-400);
+    --color-success: var(--color-teal-300);
+    --color-warning: var(--color-orange-400);
+    --color-info: var(--color-gray-300);
+    --color-focus-ring: rgba(var(--color-teal-300-rgb), 0.4);
+    --color-btn-primary-text: var(--color-slate-900);
+    --color-card-border: rgba(var(--color-gray-400-rgb), 0.2);
+    --color-card-border-inner: rgba(var(--color-gray-400-rgb), 0.15);
+    --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+    --button-border-secondary: rgba(var(--color-gray-400-rgb), 0.2);
+    --color-border-secondary: rgba(var(--color-gray-400-rgb), 0.2);
+    --color-select-caret: rgba(var(--color-gray-200-rgb), 0.8);
+
+    /* Common style patterns - updated for dark mode */
+    --focus-ring: 0 0 0 3px var(--color-focus-ring);
+    --focus-outline: 2px solid var(--color-primary);
+    --status-bg-opacity: 0.15;
+    --status-border-opacity: 0.25;
+    --select-caret-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23134252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    --select-caret-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f5f5f5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+
+    /* RGB versions for dark mode */
+    --color-success-rgb: var(--color-teal-300-rgb);
+    --color-error-rgb: var(--color-red-400-rgb);
+    --color-warning-rgb: var(--color-orange-400-rgb);
+    --color-info-rgb: var(--color-gray-300-rgb);
+  }
+}
+
+/* Base styles */
+html {
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+h1 {
+  font-size: var(--font-size-4xl);
+}
+h2 {
+  font-size: var(--font-size-3xl);
+}
+h3 {
+  font-size: var(--font-size-2xl);
+}
+h4 {
+  font-size: var(--font-size-xl);
+}
+h5 {
+  font-size: var(--font-size-lg);
+}
+h6 {
+  font-size: var(--font-size-md);
+}
+
+p {
+  margin: 0 0 var(--space-16) 0;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-base);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-standard);
+  border: none;
+  text-decoration: none;
+  position: relative;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.btn--primary {
+  background: var(--color-primary);
+  color: var(--color-btn-primary-text);
+}
+
+.btn--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn--primary:active {
+  background: var(--color-primary-active);
+}
+
+.btn--secondary {
+  background: var(--color-secondary);
+  color: var(--color-text);
+}
+
+.btn--secondary:hover {
+  background: var(--color-secondary-hover);
+}
+
+.btn--secondary:active {
+  background: var(--color-secondary-active);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--danger {
+  background: var(--color-error);
+  color: var(--color-cream-50);
+}
+
+.btn--danger:hover {
+  opacity: 0.9;
+}
+
+/* Form elements */
+.form-control {
+  display: block;
+  width: 100%;
+  padding: var(--space-8) var(--space-12);
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.form-control:focus {
+  border-color: var(--color-primary);
+  outline: var(--focus-outline);
+}
+
+.form-label {
+  display: block;
+  margin-bottom: var(--space-8);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-sm);
+}
+
+.form-group {
+  margin-bottom: var(--space-16);
+}
+
+/* Card component */
+.card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow var(--duration-normal) var(--ease-standard);
+}
+
+.card__body {
+  padding: var(--space-16);
+}
+
+/* Container layout */
+.container {
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: var(--space-16);
+  padding-left: var(--space-16);
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: var(--container-sm);
+  }
+}
+@media (min-width: 768px) {
+  .container {
+    max-width: var(--container-md);
+  }
+}
+@media (min-width: 1024px) {
+  .container {
+    max-width: var(--container-lg);
+  }
+}
+@media (min-width: 1280px) {
+  .container {
+    max-width: var(--container-xl);
+  }
+}
+
+@font-face {
+  font-family: 'FKGroteskNeue';
+  src: url('https://r2cdn.perplexity.ai/fonts/FKGroteskNeue.woff2')
+    format('woff2');
+}
+
+/* Custom styles for Tellonym Scraper */
+.input-group {
+  display: flex;
+  gap: var(--space-12);
+  align-items: flex-end;
+  margin-bottom: var(--space-24);
+}
+
+.input-group .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.delay-control {
+  display: flex;
+  gap: var(--space-8);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.delay-slider {
+  flex: 1;
+  height: var(--space-8);
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-secondary);
+  outline: none;
+  border-radius: var(--radius-full);
+}
+
+.delay-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--space-20);
+  height: var(--space-20);
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+}
+
+.delay-slider::-moz-range-thumb {
+  width: var(--space-20);
+  height: var(--space-20);
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+}
+
+.delay-input {
+  width: 80px;
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--font-size-sm);
+}
+
+.delay-help {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.progress-container {
+  margin: var(--space-16) 0;
+  display: none;
+}
+
+.progress-bar {
+  width: 100%;
+  height: var(--space-8);
+  background-color: var(--color-secondary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--color-primary);
+  width: 0%;
+  transition: width var(--duration-normal) var(--ease-standard);
+}
+
+.progress-text {
+  margin-top: var(--space-8);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.results-container {
+  margin-top: var(--space-32);
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-16);
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+
+.results-stats {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.results-actions {
+  display: flex;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-card-border);
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--color-surface);
+}
+
+.results-table th,
+.results-table td {
+  padding: var(--space-12);
+  text-align: left;
+  border-bottom: 1px solid var(--color-card-border-inner);
+}
+
+.results-table th {
+  background-color: var(--color-bg-1);
+  font-weight: var(--font-weight-semibold);
+  position: sticky;
+  top: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.results-table th:hover {
+  background-color: var(--color-bg-2);
+}
+
+.results-table tbody tr:hover {
+  background-color: var(--color-bg-1);
+}
+
+.results-table td {
+  vertical-align: top;
+}
+
+.table-cell-question,
+.table-cell-answer {
+  max-width: 250px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.table-cell-id {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+}
+
+.profile-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+}
+
+.profile-link:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+.search-container {
+  margin-bottom: var(--space-16);
+}
+
+.error-message {
+  background-color: rgba(var(--color-error-rgb), 0.1);
+  color: var(--color-error);
+  padding: var(--space-12);
+  border-radius: var(--radius-base);
+  margin: var(--space-16) 0;
+  border: 1px solid rgba(var(--color-error-rgb), 0.2);
+}
+
+.success-message {
+  background-color: rgba(var(--color-success-rgb), 0.1);
+  color: var(--color-success);
+  padding: var(--space-12);
+  border-radius: var(--radius-base);
+  margin: var(--space-16) 0;
+  border: 1px solid rgba(var(--color-success-rgb), 0.2);
+}
+
+.sort-indicator {
+  margin-left: var(--space-4);
+  font-size: var(--font-size-xs);
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-secondary);
+  border-radius: 50%;
+  border-top-color: var(--color-primary);
+  animation: spin 1s ease-in-out infinite;
+  margin-right: var(--space-8);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-32);
+  color: var(--color-text-secondary);
+}
+
+.active-dot {
+  font-size: var(--font-size-xl);
+  line-height: 1;
+}
+
+.active-dot--active {
+  color: #4CAF50;
+}
+
+.active-dot--inactive {
+  color: #cccccc;
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-16);
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-8);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .input-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .results-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .results-actions {
+    justify-content: center;
+  }
+  
+  .table-cell-question,
+  .table-cell-answer {
+    max-width: 150px;
+  }
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header style="text-align: center; margin: var(--space-32) 0;">
+            <h1>Tellonym Answer Scraper</h1>
+            <p style="color: var(--color-text-secondary); margin-top: var(--space-8);">Fetch consecutive Tellonym answers starting from any ID</p>
+        </header>
+
+        <div class="card">
+            <div class="card__body">
+                <div class="input-group">
+                    <div class="form-group">
+                        <label for="tellId" class="form-label">Starting Tell ID</label>
+                        <input type="number" id="tellId" class="form-control" placeholder="e.g., 6513371597" value="6513371597" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="delaySlider" class="form-label">Delay between requests (milliseconds)</label>
+                        <div class="delay-control">
+                            <input type="range" id="delaySlider" class="delay-slider" min="0" max="5000" value="150" step="50">
+                            <input type="number" id="delayInput" class="delay-input" min="0" max="5000" value="150">
+                        </div>
+                        <div class="delay-help">Increase if getting errors (recommended: 150-500ms)</div>
+                    </div>
+                    <button id="fetchBtn" class="btn btn--primary">Fetch Answers</button>
+                    <button id="stopBtn" class="btn btn--danger" style="display: none;">Stop</button>
+                </div>
+
+                <div id="progressContainer" class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div id="progressText" class="progress-text">Preparing to fetch...</div>
+                </div>
+
+                <div id="messageContainer"></div>
+            </div>
+        </div>
+
+        <div id="resultsContainer" class="results-container" style="display: none;">
+            <div class="results-header">
+                <div>
+                    <h3>Results</h3>
+                    <div id="resultsStats" class="results-stats"></div>
+                </div>
+                <div class="results-actions">
+                    <button id="exportBtn" class="btn btn--secondary">Export CSV</button>
+                    <button id="clearBtn" class="btn btn--secondary">Clear Results</button>
+                </div>
+            </div>
+
+            <div class="search-container">
+                <input type="text" id="searchInput" class="form-control" placeholder="Search questions, answers, or usernames...">
+            </div>
+            
+            <div class="legend">
+                <strong>Legend:</strong>
+                <div class="legend-item">
+                    <span class="active-dot active-dot--active">●</span>
+                    <span>Active User</span>
+                </div>
+                <div class="legend-item">
+                    <span class="active-dot active-dot--inactive">●</span>
+                    <span>Inactive User</span>
+                </div>
+                <div class="legend-item">
+                    <span style="color: var(--color-text-secondary); font-size: var(--font-size-xs);">—</span>
+                    <span>Unknown</span>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="resultsTable" class="results-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="id">Tell ID <span class="sort-indicator"></span></th>
+                            <th data-sort="tell">Question/Tell <span class="sort-indicator"></span></th>
+                            <th data-sort="answer">Answer <span class="sort-indicator"></span></th>
+                            <th data-sort="username">Username <span class="sort-indicator"></span></th>
+                            <th>Profile Link</th>
+                            <th data-sort="active">Active <span class="sort-indicator"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            TELLONYM_API: 'https://api.tellonym.me/answers/id/',
+            PROFILE_NAME_API: 'https://api.tellonym.me/profiles/name/',
+            CORS_PROXY_PRIMARY: 'https://api.allorigins.win/get?url=',
+            CORS_PROXY_FALLBACK1: 'https://corsproxy.io/?',
+            CORS_PROXY_FALLBACK2: '', // Direct fetch
+            PROFILE_BASE_URL: 'https://tellonym.me/',
+            CONSECUTIVE_COUNT: 200,
+            DEFAULT_DELAY: 150,
+            REQUEST_TIMEOUT: 10000
+        };
+
+        // User settings
+        let userSettings = {
+            delayMs: 150
+        };
+
+        // State management
+        let currentFetch = {
+            isRunning: false,
+            shouldStop: false,
+            startId: null,
+            results: [],
+            successCount: 0,
+            errorCount: 0,
+            currentIndex: 0,
+            activeCount: 0
+        };
+
+        let sortState = {
+            column: null,
+            direction: 'asc'
+        };
+
+        // DOM elements
+        const elements = {
+            tellIdInput: document.getElementById('tellId'),
+            delaySlider: document.getElementById('delaySlider'),
+            delayInput: document.getElementById('delayInput'),
+            fetchBtn: document.getElementById('fetchBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            progressContainer: document.getElementById('progressContainer'),
+            progressFill: document.getElementById('progressFill'),
+            progressText: document.getElementById('progressText'),
+            messageContainer: document.getElementById('messageContainer'),
+            resultsContainer: document.getElementById('resultsContainer'),
+            resultsStats: document.getElementById('resultsStats'),
+            exportBtn: document.getElementById('exportBtn'),
+            clearBtn: document.getElementById('clearBtn'),
+            searchInput: document.getElementById('searchInput'),
+            resultsTable: document.getElementById('resultsTable'),
+            resultsBody: document.getElementById('resultsBody')
+        };
+
+        // Utility functions
+        function showMessage(message, type = 'error') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `${type}-message`;
+            messageDiv.textContent = message;
+            elements.messageContainer.innerHTML = '';
+            elements.messageContainer.appendChild(messageDiv);
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    if (elements.messageContainer.contains(messageDiv)) {
+                        elements.messageContainer.removeChild(messageDiv);
+                    }
+                }, 5000);
+            }
+        }
+
+        function clearMessages() {
+            elements.messageContainer.innerHTML = '';
+        }
+
+        function validateInput() {
+            const tellId = elements.tellIdInput.value.trim();
+            if (!tellId) {
+                showMessage('Please enter a Tell ID');
+                return false;
+            }
+            if (isNaN(tellId) || parseInt(tellId) <= 0) {
+                showMessage('Please enter a valid positive number');
+                return false;
+            }
+            return parseInt(tellId);
+        }
+
+        function updateProgress(current, total) {
+            const percentage = (current / total) * 100;
+            elements.progressFill.style.width = `${percentage}%`;
+            elements.progressText.textContent = `Fetching ${current}/${total} (${currentFetch.successCount} successful, ${currentFetch.activeCount} active, ${currentFetch.errorCount} errors) | Delay: ${userSettings.delayMs}ms`;
+        }
+
+        function updateStats() {
+            const total = currentFetch.successCount + currentFetch.errorCount;
+            elements.resultsStats.textContent = `Total: ${currentFetch.results.length} results | Successful: ${currentFetch.successCount} | Active Users: ${currentFetch.activeCount} | Errors: ${currentFetch.errorCount} | Fetched: ${new Date().toLocaleString()}`;
+        }
+
+        // API functions
+        async function fetchWithProxy(targetUrl, proxies) {
+            let lastError = null;
+            
+            for (const proxy of proxies) {
+                try {
+                    const url = proxy.url ? `${proxy.url}${encodeURIComponent(targetUrl)}` : targetUrl;
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT);
+                    
+                    const response = await fetch(url, {
+                        signal: controller.signal,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    let data = await response.json();
+                    
+                    // Handle allorigins.win /get endpoint response structure
+                    if (proxy.needsParsing && data.contents) {
+                        try {
+                            data = JSON.parse(data.contents);
+                        } catch (parseError) {
+                            throw new Error('Failed to parse nested JSON response');
+                        }
+                    }
+                    
+                    return data;
+                    
+                } catch (error) {
+                    console.warn(`Failed using ${proxy.name}:`, error.message);
+                    lastError = error;
+                    continue;
+                }
+            }
+            
+            throw lastError || new Error('All proxy methods failed');
+        }
+
+        async function fetchSingleAnswer(id) {
+            const proxies = [
+                { name: 'allorigins.win', url: CONFIG.CORS_PROXY_PRIMARY, needsParsing: true },
+                { name: 'corsproxy.io', url: CONFIG.CORS_PROXY_FALLBACK1, needsParsing: false },
+                { name: 'direct', url: CONFIG.CORS_PROXY_FALLBACK2, needsParsing: false }
+            ];
+            
+            // Step 1: Fetch the answer
+            const targetUrl = CONFIG.TELLONYM_API + id;
+            const data = await fetchWithProxy(targetUrl, proxies);
+            
+            // Validate response structure
+            if (!data || (!data.answer && !data.answerText && !data.response) || (!data.tell && !data.question && !data.tellText)) {
+                throw new Error('Invalid response structure - missing answer or question');
+            }
+            
+            // Extract fields with priority order
+            const tell = data.tell || data.question || data.tellText || 'No question';
+            const answer = data.answer || data.answerText || data.response || 'No answer';
+            
+            // Extract receiver's username (person who answered) with priority order
+            let receiverUsername = 'Anonymous';
+            if (data.user && data.user.username) {
+                receiverUsername = data.user.username;
+            } else if (data.username && !data.senderSlug) {
+                receiverUsername = data.username;
+            } else if (data.answerUser && data.answerUser.username) {
+                receiverUsername = data.answerUser.username;
+            } else if (data.receiver && data.receiver.username) {
+                receiverUsername = data.receiver.username;
+            }
+            
+            console.log(`Successfully fetched ID ${id}:`, { tell: tell.substring(0, 50), answer: answer.substring(0, 50), username: receiverUsername });
+            
+            // Step 2: Get profile with isActive status directly from profiles/name endpoint
+            let isActive = null;
+            
+            if (receiverUsername !== 'Anonymous') {
+                try {
+                    // Add delay before profile request
+                    await delay(userSettings.delayMs);
+                    
+                    const profileUrl = CONFIG.PROFILE_NAME_API + receiverUsername;
+                    const profileData = await fetchWithProxy(profileUrl, proxies);
+                    
+                    // Extract isActive directly from the profile response
+                    if (profileData && typeof profileData.isActive === 'boolean') {
+                        isActive = profileData.isActive;
+                        console.log(`${receiverUsername} is ${isActive ? '🟢 ACTIVE' : '⚪ INACTIVE'} (from profile endpoint)`);
+                    } else {
+                        console.warn(`isActive field not found in profile response for ${receiverUsername}`);
+                    }
+                } catch (error) {
+                    console.warn(`Failed to fetch active status for ${receiverUsername}:`, error.message);
+                    // Continue without active status
+                }
+            }
+            
+            return {
+                id: id,
+                tell: tell,
+                answer: answer,
+                username: receiverUsername,
+                createdAt: data.createdAt || null,
+                isActive: isActive
+            };
+        }
+
+        async function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Main fetch function
+        async function startFetching() {
+            const startId = validateInput();
+            if (!startId) return;
+
+            // Reset state
+            currentFetch = {
+                isRunning: true,
+                shouldStop: false,
+                startId: startId,
+                results: [],
+                successCount: 0,
+                errorCount: 0,
+                currentIndex: 0
+            };
+
+            // Update UI
+            elements.fetchBtn.style.display = 'none';
+            elements.stopBtn.style.display = 'inline-flex';
+            elements.progressContainer.style.display = 'block';
+            clearMessages();
+
+            try {
+                for (let i = 0; i < CONFIG.CONSECUTIVE_COUNT; i++) {
+                    if (currentFetch.shouldStop) {
+                        showMessage('Fetch operation stopped by user', 'success');
+                        break;
+                    }
+
+                    const currentId = startId + i;
+                    currentFetch.currentIndex = i + 1;
+                    updateProgress(currentFetch.currentIndex, CONFIG.CONSECUTIVE_COUNT);
+
+                    try {
+                        console.log(`Attempting to fetch ID: ${currentId}`);
+                        const result = await fetchSingleAnswer(currentId);
+                        currentFetch.results.push(result);
+                        currentFetch.successCount++;
+                        
+                        // Count active users
+                        if (result.isActive === true) {
+                            currentFetch.activeCount++;
+                        }
+                        
+                        // Add to table immediately
+                        addRowToTable(result);
+                        
+                        console.log(`✅ Successfully fetched ID ${currentId}: ${result.username} - ${result.tell.substring(0, 30)}...`);
+                        
+                    } catch (error) {
+                        console.warn(`❌ Failed to fetch ID ${currentId}:`, error.message);
+                        currentFetch.errorCount++;
+                        
+                        // Log more details for debugging
+                        if (currentId === currentFetch.startId) {
+                            console.error('First ID failed - this might indicate a systematic issue:', error);
+                        }
+                    }
+
+                    // Update stats
+                    updateStats();
+                    
+                    // Show results container after first successful fetch
+                    if (currentFetch.results.length === 1) {
+                        elements.resultsContainer.style.display = 'block';
+                    }
+
+                    // Delay between requests (except for the last one)
+                    if (i < CONFIG.CONSECUTIVE_COUNT - 1 && !currentFetch.shouldStop) {
+                        await delay(userSettings.delayMs);
+                    }
+                }
+
+                if (!currentFetch.shouldStop) {
+                    showMessage(`Completed! Found ${currentFetch.successCount} answers out of ${CONFIG.CONSECUTIVE_COUNT} IDs checked.`, 'success');
+                }
+
+            } catch (error) {
+                showMessage(`Unexpected error: ${error.message}`);
+            } finally {
+                // Reset UI
+                currentFetch.isRunning = false;
+                elements.fetchBtn.style.display = 'inline-flex';
+                elements.stopBtn.style.display = 'none';
+                elements.progressContainer.style.display = 'none';
+            }
+        }
+
+        function stopFetching() {
+            currentFetch.shouldStop = true;
+        }
+
+        // Table functions
+        function addRowToTable(result) {
+            const row = document.createElement('tr');
+            
+            let activeCell = '';
+            if (result.isActive === true) {
+                activeCell = '<span class="active-dot active-dot--active" title="Active User">●</span>';
+            } else if (result.isActive === false) {
+                activeCell = '<span class="active-dot active-dot--inactive" title="Inactive User">●</span>';
+            } else {
+                activeCell = '<span style="color: var(--color-text-secondary); font-size: var(--font-size-xs);" title="Status Unknown">—</span>';
+            }
+            
+            row.innerHTML = `
+                <td class="table-cell-id">${result.id}</td>
+                <td class="table-cell-question">${escapeHtml(result.tell)}</td>
+                <td class="table-cell-answer">${escapeHtml(result.answer)}</td>
+                <td>${escapeHtml(result.username)}</td>
+                <td><a href="${CONFIG.PROFILE_BASE_URL}${encodeURIComponent(result.username)}" target="_blank" class="profile-link">View Profile</a></td>
+                <td style="text-align: center;">${activeCell}</td>
+            `;
+            elements.resultsBody.appendChild(row);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function clearResults() {
+            currentFetch.results = [];
+            currentFetch.successCount = 0;
+            currentFetch.errorCount = 0;
+            currentFetch.activeCount = 0;
+            elements.resultsBody.innerHTML = '';
+            elements.resultsContainer.style.display = 'none';
+            clearMessages();
+        }
+
+        function filterResults() {
+            const searchTerm = elements.searchInput.value.toLowerCase();
+            const rows = elements.resultsBody.querySelectorAll('tr');
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const text = Array.from(cells).slice(0, 4).map(cell => cell.textContent.toLowerCase()).join(' ');
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        }
+
+        function sortTable(column) {
+            const tbody = elements.resultsBody;
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Update sort state
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                sortState.direction = 'asc';
+            }
+            
+            // Update sort indicators
+            document.querySelectorAll('.sort-indicator').forEach(indicator => {
+                indicator.textContent = '';
+            });
+            
+            const currentHeader = document.querySelector(`[data-sort="${column}"] .sort-indicator`);
+            if (currentHeader) {
+                currentHeader.textContent = sortState.direction === 'asc' ? '▲' : '▼';
+            }
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                let aVal, bVal;
+                
+                switch (column) {
+                    case 'id':
+                        aVal = parseInt(a.cells[0].textContent);
+                        bVal = parseInt(b.cells[0].textContent);
+                        break;
+                    case 'tell':
+                        aVal = a.cells[1].textContent.toLowerCase();
+                        bVal = b.cells[1].textContent.toLowerCase();
+                        break;
+                    case 'answer':
+                        aVal = a.cells[2].textContent.toLowerCase();
+                        bVal = b.cells[2].textContent.toLowerCase();
+                        break;
+                    case 'username':
+                        aVal = a.cells[3].textContent.toLowerCase();
+                        bVal = b.cells[3].textContent.toLowerCase();
+                        break;
+                    case 'active':
+                        // Sort by active status: active (●) > inactive (●) > unknown (—)
+                        const aActive = a.cells[5].textContent.trim();
+                        const bActive = b.cells[5].textContent.trim();
+                        const getValue = (text) => {
+                            if (text === '●' && a.cells[5].querySelector('.active-dot--active')) return 2;
+                            if (text === '●' && a.cells[5].querySelector('.active-dot--inactive')) return 1;
+                            return 0;
+                        };
+                        aVal = getValue(aActive);
+                        bVal = getValue(bActive);
+                        break;
+                    default:
+                        return 0;
+                }
+                
+                if (sortState.direction === 'asc') {
+                    return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                } else {
+                    return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+                }
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function exportToCSV() {
+            if (currentFetch.results.length === 0) {
+                showMessage('No data to export');
+                return;
+            }
+            
+            const headers = ['Tell ID', 'Question/Tell', 'Answer', 'Username', 'Profile URL', 'Active Status'];
+            const csvContent = [
+                headers.join(','),
+                ...currentFetch.results.map(result => [
+                    result.id,
+                    `"${result.tell.replace(/"/g, '""')}"`,
+                    `"${result.answer.replace(/"/g, '""')}"`,
+                    `"${result.username.replace(/"/g, '""')}"`,
+                    `"${CONFIG.PROFILE_BASE_URL}${result.username}"`,
+                    result.isActive === true ? 'Active' : result.isActive === false ? 'Inactive' : 'Unknown'
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `tellonym_answers_${currentFetch.startId}_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showMessage('CSV exported successfully!', 'success');
+        }
+
+        // Event listeners
+        elements.fetchBtn.addEventListener('click', startFetching);
+        elements.stopBtn.addEventListener('click', stopFetching);
+        elements.clearBtn.addEventListener('click', clearResults);
+        elements.exportBtn.addEventListener('click', exportToCSV);
+        elements.searchInput.addEventListener('input', filterResults);
+
+        // Delay control event listeners
+        elements.delaySlider.addEventListener('input', () => {
+            const value = parseInt(elements.delaySlider.value);
+            elements.delayInput.value = value;
+            userSettings.delayMs = value;
+        });
+
+        elements.delayInput.addEventListener('input', () => {
+            let value = parseInt(elements.delayInput.value);
+            
+            // Validate input bounds
+            if (isNaN(value) || value < 0) value = 0;
+            if (value > 5000) value = 5000;
+            
+            elements.delayInput.value = value;
+            elements.delaySlider.value = value;
+            userSettings.delayMs = value;
+        });
+
+        // Prevent invalid characters in delay input
+        elements.delayInput.addEventListener('keypress', (e) => {
+            if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        // Table header click listeners for sorting
+        document.querySelectorAll('[data-sort]').forEach(header => {
+            header.addEventListener('click', () => {
+                const column = header.getAttribute('data-sort');
+                sortTable(column);
+            });
+        });
+
+        // Allow Enter key to trigger fetch
+        elements.tellIdInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !currentFetch.isRunning) {
+                startFetching();
+            }
+        });
+
+        // Test function for debugging
+        async function testSingleId(id) {
+            console.log(`🧪 Testing single ID: ${id}`);
+            try {
+                const result = await fetchSingleAnswer(id);
+                console.log('✅ Test successful:', result);
+                showMessage(`Test successful! Found answer by ${result.username}`, 'success');
+                return result;
+            } catch (error) {
+                console.error('❌ Test failed:', error);
+                showMessage(`Test failed: ${error.message}`);
+                throw error;
+            }
+        }
+        
+        // Add test button functionality
+        function addTestButton() {
+            const testBtn = document.createElement('button');
+            testBtn.textContent = 'Test Single ID';
+            testBtn.className = 'btn btn--secondary';
+            testBtn.style.marginLeft = 'var(--space-8)';
+            testBtn.addEventListener('click', () => {
+                const id = validateInput();
+                if (id) testSingleId(id);
+            });
+            elements.fetchBtn.parentNode.appendChild(testBtn);
+        }
+        
+        // Initialize
+        console.log('Tellonym Answer Scraper initialized');
+        console.log('Pre-filled with test ID 6513371597 - click "Test Single ID" to verify it works');
+        addTestButton();
+    </script>
+</body>
+</html>
