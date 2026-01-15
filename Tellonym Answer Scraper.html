@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tellonym Answer Scraper</title>
+    <style>
+        :root {
+            --color-cream-50: rgba(252, 252, 249, 1);
+            --color-cream-100: rgba(255, 255, 253, 1);
+            --color-slate-500: rgba(98, 108, 113, 1);
+            --color-slate-900: rgba(19, 52, 59, 1);
+            --color-teal-500: rgba(33, 128, 141, 1);
+            --color-teal-600: rgba(29, 116, 128, 1);
+            --color-red-500: rgba(192, 21, 47, 1);
+            --color-red-400: rgba(255, 84, 89, 1);
+            --space-8: 8px;
+            --space-12: 12px;
+            --space-16: 16px;
+            --space-24: 24px;
+            --space-32: 32px;
+            --radius-base: 8px;
+            --radius-lg: 12px;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--color-cream-50);
+            color: var(--color-slate-900);
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0;
+            padding: var(--space-16);
+        }
+        
+        header {
+            text-align: center;
+            margin: var(--space-32) 0;
+        }
+        
+        h1 { margin: 0; font-size: 2.25rem; }
+        p { margin: 8px 0 0; color: var(--color-slate-500); }
+        
+        .card {
+            background: var(--color-cream-100);
+            border-radius: var(--radius-lg);
+            border: 1px solid rgba(94, 82, 64, 0.1);
+            padding: var(--space-16);
+            margin-bottom: var(--space-32);
+        }
+        
+        .form-group {
+            margin-bottom: var(--space-16);
+        }
+        
+        label {
+            display: block;
+            margin-bottom: var(--space-8);
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        
+        input[type="number"],
+        input[type="text"],
+        input[type="range"],
+        select {
+            width: 100%;
+            padding: var(--space-8) var(--space-12);
+            border: 1px solid rgba(94, 82, 64, 0.2);
+            border-radius: var(--radius-base);
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        
+        select {
+            padding: var(--space-8) var(--space-12);
+        }
+        
+        .help-text {
+            font-size: 0.75rem;
+            color: var(--color-slate-500);
+            font-style: italic;
+            margin-top: var(--space-8);
+        }
+        
+        .input-row {
+            display: flex;
+            gap: var(--space-12);
+            align-items: flex-end;
+            margin-bottom: var(--space-24);
+            flex-wrap: wrap;
+        }
+        
+        .input-row > .form-group {
+            flex: 1;
+            min-width: 200px;
+            margin-bottom: 0;
+        }
+        
+        .btn {
+            padding: var(--space-8) var(--space-16);
+            border: none;
+            border-radius: var(--radius-base);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-8);
+        }
+        
+        .btn-primary {
+            background: var(--color-teal-500);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--color-teal-600);
+        }
+        
+        .btn-danger {
+            background: var(--color-red-500);
+            color: white;
+            display: none;
+        }
+        
+        .btn-secondary {
+            background: rgba(94, 82, 64, 0.12);
+            color: var(--color-slate-900);
+        }
+        
+        .progress-container {
+            display: none;
+            margin: var(--space-16) 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(94, 82, 64, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--color-teal-500);
+            width: 0%;
+            transition: width 0.25s ease;
+        }
+        
+        .progress-text {
+            margin-top: var(--space-8);
+            font-size: 0.875rem;
+            color: var(--color-slate-500);
+            text-align: center;
+        }
+        
+        .message {
+            padding: var(--space-12);
+            border-radius: var(--radius-base);
+            margin: var(--space-16) 0;
+            border: 1px solid;
+        }
+        
+        .error-message {
+            background: rgba(192, 21, 47, 0.1);
+            color: var(--color-red-500);
+            border-color: rgba(192, 21, 47, 0.2);
+        }
+        
+        .success-message {
+            background: rgba(33, 128, 141, 0.1);
+            color: var(--color-teal-500);
+            border-color: rgba(33, 128, 141, 0.2);
+        }
+        
+        .results-container {
+            display: none;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-16);
+            flex-wrap: wrap;
+            gap: var(--space-12);
+        }
+        
+        .results-stats {
+            font-size: 0.875rem;
+            color: var(--color-slate-500);
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid rgba(94, 82, 64, 0.1);
+            border-radius: var(--radius-lg);
+            width: 100%;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--color-cream-100);
+        }
+        
+        th {
+            padding: var(--space-12);
+            text-align: left;
+            background: rgba(59, 130, 246, 0.08);
+            font-weight: 550;
+            border-bottom: 1px solid rgba(94, 82, 64, 0.1);
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        th:hover {
+            background: rgba(245, 158, 11, 0.08);
+        }
+        
+        td {
+            padding: var(--space-12);
+            border-bottom: 1px solid rgba(94, 82, 64, 0.1);
+            vertical-align: top;
+        }
+        
+        tr:hover {
+            background: rgba(59, 130, 246, 0.08);
+        }
+        
+        a {
+            color: var(--color-teal-500);
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: var(--space-8);
+        }
+        
+        input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tellonym Answer Scraper</h1>
+            <p>Fetch consecutive Tellonym answers with selectable CORS proxy</p>
+        </header>
+        
+        <div class="card">
+            <form id="settingsForm">
+                <div class="input-row">
+                    <div class="form-group">
+                        <label for="tellId">Starting Answer ID</label>
+                        <input type="number" id="tellId" value="6553167603" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="totalTells">Total Tells to Fetch</label>
+                        <input type="number" id="totalTells" value="200" min="1" max="5000">
+                        <div class="help-text">Max 5000 per session</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="batchSize">Batch Size</label>
+                        <input type="number" id="batchSize" value="10" min="1" max="50">
+                        <div class="help-text">1-50 (higher = faster)</div>
+                    </div>
+                </div>
+                
+                <div class="input-row">
+                    <div class="form-group">
+                        <label for="corsProxy">CORS Proxy</label>
+                        <select id="corsProxy">
+                            <option value="allorigins">AllOrigins (Fast, Reliable)</option>
+                            <option value="corsproxy">CorsProxy.io</option>
+                            <option value="corsanywhere">CORS Anywhere</option>
+                            <option value="fastcors">FastCORS</option>
+                            <option value="api2">API2 Proxy</option>
+                            <option value="corsflare">CorsFlare</option>
+                            <option value="direct">Direct (No Proxy)</option>
+                        </select>
+                        <div class="help-text">Try different proxies if one fails</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="delay">Delay (ms)</label>
+                        <input type="number" id="delay" value="50" min="0" max="5000">
+                        <div class="help-text">Between requests</div>
+                    </div>
+                    <div style="flex: 0 0 auto; display: flex; gap: var(--space-12);">
+                        <button type="submit" class="btn btn-primary" id="fetchBtn">Fetch</button>
+                        <button type="button" class="btn btn-danger" id="stopBtn">Stop</button>
+                    </div>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="parallelBatches" checked>
+                    <label for="parallelBatches" style="margin: 0; font-weight: normal;">Parallel batch processing</label>
+                </div>
+                
+                <div class="checkbox-group" style="margin-top: var(--space-12);">
+                    <input type="checkbox" id="arabicFilter" checked>
+                    <label for="arabicFilter" style="margin: 0; font-weight: normal;">Hide Arabic characters</label>
+                </div>
+                
+                <div id="progressContainer" class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div id="progressText" class="progress-text">Starting...</div>
+                </div>
+                
+                <div id="messageContainer"></div>
+            </form>
+        </div>
+        
+        <div id="resultsContainer" class="results-container">
+            <div class="card">
+                <div class="results-header">
+                    <div>
+                        <h3 style="margin: 0 0 8px;">Results</h3>
+                        <div id="resultsStats" class="results-stats"></div>
+                    </div>
+                    <div style="display: flex; gap: var(--space-8);">
+                        <button class="btn btn-secondary" id="exportBtn">Export CSV</button>
+                        <button class="btn btn-secondary" id="clearBtn">Clear</button>
+                    </div>
+                </div>
+                
+                <input type="text" id="searchInput" placeholder="Search questions, answers, or usernames..." style="margin-bottom: var(--space-16);">
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th data-col="id">Tell ID</th>
+                                <th data-col="tell">Question/Tell</th>
+                                <th data-col="answer">Answer</th>
+                                <th data-col="username">Username</th>
+                                <th>Profile Link</th>
+                                <th data-col="active">Active</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const CORS_PROXIES = {
+            allorigins: { name: 'AllOrigins', url: 'https://api.allorigins.win/get?url=', needsParsing: true },
+            corsproxy: { name: 'CorsProxy.io', url: 'https://corsproxy.io/?', needsParsing: false },
+            corsanywhere: { name: 'CORS Anywhere', url: 'https://cors-anywhere.herokuapp.com/', needsParsing: false },
+            fastcors: { name: 'FastCORS', url: 'https://fastcors.herokuapp.com/cors/', needsParsing: false },
+            api2: { name: 'API2 Proxy', url: 'https://api2.api.co/api/cors?url=', needsParsing: false },
+            corsflare: { name: 'CorsFlare', url: 'https://corsflare.herokuapp.com/', needsParsing: false },
+            direct: { name: 'Direct', url: '', needsParsing: false }
+        };
+        
+        const STATE = {
+            isRunning: false,
+            shouldStop: false,
+            results: [],
+            successCount: 0,
+            errorCount: 0,
+            activeCount: 0,
+            filteredCount: 0,
+            startTime: null,
+            selectedProxy: 'allorigins'
+        };
+        
+        const ELEMENTS = {
+            tellId: document.getElementById('tellId'),
+            totalTells: document.getElementById('totalTells'),
+            batchSize: document.getElementById('batchSize'),
+            corsProxy: document.getElementById('corsProxy'),
+            delay: document.getElementById('delay'),
+            fetchBtn: document.getElementById('fetchBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            progressContainer: document.getElementById('progressContainer'),
+            progressFill: document.getElementById('progressFill'),
+            progressText: document.getElementById('progressText'),
+            messageContainer: document.getElementById('messageContainer'),
+            parallelBatches: document.getElementById('parallelBatches'),
+            arabicFilter: document.getElementById('arabicFilter'),
+            resultsContainer: document.getElementById('resultsContainer'),
+            resultsStats: document.getElementById('resultsStats'),
+            resultsBody: document.getElementById('resultsBody'),
+            exportBtn: document.getElementById('exportBtn'),
+            clearBtn: document.getElementById('clearBtn'),
+            searchInput: document.getElementById('searchInput'),
+            settingsForm: document.getElementById('settingsForm')
+        };
+        
+        function showMessage(msg, type = 'error') {
+            const div = document.createElement('div');
+            div.className = `message ${type}-message`;
+            div.textContent = msg;
+            ELEMENTS.messageContainer.innerHTML = '';
+            ELEMENTS.messageContainer.appendChild(div);
+            if (type === 'success') setTimeout(() => div.remove(), 5000);
+        }
+        
+        function hasArabic(text) {
+            return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function fetchWithProxy(targetUrl) {
+            const proxyKey = ELEMENTS.corsProxy.value;
+            const proxy = CORS_PROXIES[proxyKey];
+            
+            try {
+                const url = proxy.url ? `${proxy.url}${encodeURIComponent(targetUrl)}` : targetUrl;
+                const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                let data = await response.json();
+                if (proxy.needsParsing && data.contents) {
+                    data = JSON.parse(data.contents);
+                }
+                return data;
+            } catch (error) {
+                throw new Error(`${proxy.name}: ${error.message}`);
+            }
+        }
+        
+        async function fetchSingleAnswer(id) {
+            const tell = `https://api.tellonym.me/answers/id/${id}`;
+            const data = await fetchWithProxy(tell);
+            
+            if (!data?.answer && !data?.tell) throw new Error('Invalid response');
+            
+            const result = {
+                id,
+                tell: data.tell || 'No question',
+                answer: data.answer || 'No answer',
+                username: data.user?.username || 'Anonymous',
+                isActive: null
+            };
+            
+            if (result.username !== 'Anonymous') {
+                try {
+                    await new Promise(r => setTimeout(r, parseInt(ELEMENTS.delay.value)));
+                    const profile = await fetchWithProxy(`https://api.tellonym.me/profiles/name/${result.username}`);
+                    result.isActive = profile.isActive ?? null;
+                } catch (e) {
+                    console.warn('Profile fetch failed:', e);
+                }
+            }
+            
+            return result;
+        }
+        
+        function addRow(result) {
+            const row = document.createElement('tr');
+            const shouldFilter = ELEMENTS.arabicFilter.checked && (hasArabic(result.username) || hasArabic(result.tell) || hasArabic(result.answer));
+            
+            if (shouldFilter) {
+                row.style.display = 'none';
+                row.dataset.filtered = 'true';
+                STATE.filteredCount++;
+            }
+            
+            const activeSymbol = result.isActive === true ? '●' : result.isActive === false ? '●' : '–';
+            const activeStyle = result.isActive === true ? 'color: #4CAF50;' : result.isActive === false ? 'color: #ccc;' : '';
+            
+            row.innerHTML = `
+                <td>${result.id}</td>
+                <td style="max-width: 200px; white-space: pre-wrap;">${escapeHtml(result.tell)}</td>
+                <td style="max-width: 200px; white-space: pre-wrap;">${escapeHtml(result.answer)}</td>
+                <td>${escapeHtml(result.username)}</td>
+                <td><a href="https://tellonym.me/${encodeURIComponent(result.username)}" target="_blank">Profile</a></td>
+                <td style="text-align: center; ${activeStyle}">${activeSymbol}</td>
+            `;
+            
+            ELEMENTS.resultsBody.appendChild(row);
+            if (result.isActive === true) STATE.activeCount++;
+        }
+        
+        async function startFetch(e) {
+            e.preventDefault();
+            if (STATE.isRunning) return;
+            
+            STATE.isRunning = true;
+            STATE.results = [];
+            STATE.successCount = STATE.errorCount = STATE.activeCount = STATE.filteredCount = 0;
+            STATE.startTime = Date.now();
+            
+            ELEMENTS.fetchBtn.style.display = 'none';
+            ELEMENTS.stopBtn.style.display = 'inline-flex';
+            ELEMENTS.progressContainer.style.display = 'block';
+            ELEMENTS.resultsContainer.style.display = 'block';
+            ELEMENTS.messageContainer.innerHTML = '';
+            
+            const startId = parseInt(ELEMENTS.tellId.value);
+            const count = parseInt(ELEMENTS.totalTells.value);
+            const batchSize = parseInt(ELEMENTS.batchSize.value);
+            const useParallel = ELEMENTS.parallelBatches.checked;
+            
+            showMessage(`Fetching ${count} answers using ${CORS_PROXIES[ELEMENTS.corsProxy.value].name}...`, 'success');
+            
+            try {
+                const ids = Array.from({length: count}, (_, i) => startId + i);
+                
+                if (useParallel) {
+                    for (let i = 0; i < ids.length && !STATE.shouldStop; i += batchSize) {
+                        const batch = ids.slice(i, i + batchSize);
+                        const promises = batch.map(async (id) => {
+                            try {
+                                const result = await fetchSingleAnswer(id);
+                                STATE.results.push(result);
+                                STATE.successCount++;
+                                addRow(result);
+                            } catch (err) {
+                                console.error(err);
+                                STATE.errorCount++;
+                            }
+                        });
+                        
+                        await Promise.allSettled(promises);
+                        
+                        const pct = (Math.min(i + batchSize, count) / count * 100).toFixed(0);
+                        ELEMENTS.progressFill.style.width = `${pct}%`;
+                        ELEMENTS.progressText.textContent = `Batch: ${Math.ceil((i + batchSize) / batchSize)} | Success: ${STATE.successCount} | Active: ${STATE.activeCount} | Errors: ${STATE.errorCount}`;
+                        
+                        if (i + batchSize < ids.length) await new Promise(r => setTimeout(r, parseInt(ELEMENTS.delay.value)));
+                    }
+                } else {
+                    for (let i = 0; i < ids.length && !STATE.shouldStop; i++) {
+                        try {
+                            const result = await fetchSingleAnswer(ids[i]);
+                            STATE.results.push(result);
+                            STATE.successCount++;
+                            addRow(result);
+                        } catch (err) {
+                            console.error(err);
+                            STATE.errorCount++;
+                        }
+                        
+                        const pct = ((i + 1) / count * 100).toFixed(0);
+                        ELEMENTS.progressFill.style.width = `${pct}%`;
+                        ELEMENTS.progressText.textContent = `Progress: ${i + 1}/${count} | Success: ${STATE.successCount} | Active: ${STATE.activeCount} | Errors: ${STATE.errorCount}`;
+                        
+                        if (i < ids.length - 1) await new Promise(r => setTimeout(r, parseInt(ELEMENTS.delay.value)));
+                    }
+                }
+                
+                if (!STATE.shouldStop) {
+                    const time = ((Date.now() - STATE.startTime) / 1000).toFixed(1);
+                    showMessage(`Complete! ${STATE.successCount} answers, ${STATE.activeCount} active users in ${time}s`, 'success');
+                }
+            } catch (err) {
+                showMessage(`Error: ${err.message}`);
+            } finally {
+                STATE.isRunning = false;
+                STATE.shouldStop = false;
+                ELEMENTS.fetchBtn.style.display = 'inline-flex';
+                ELEMENTS.stopBtn.style.display = 'none';
+                ELEMENTS.progressContainer.style.display = 'none';
+                updateStats();
+            }
+        }
+        
+        function stopFetch() {
+            STATE.shouldStop = true;
+        }
+        
+        function clearResults() {
+            STATE.results = [];
+            ELEMENTS.resultsBody.innerHTML = '';
+            ELEMENTS.resultsContainer.style.display = 'none';
+        }
+        
+        function updateStats() {
+            const shown = STATE.results.length - STATE.filteredCount;
+            ELEMENTS.resultsStats.textContent = `Total: ${STATE.results.length} | Shown: ${shown} | Active: ${STATE.activeCount} | Errors: ${STATE.errorCount}`;
+        }
+        
+        function filterResults() {
+            const term = ELEMENTS.searchInput.value.toLowerCase();
+            ELEMENTS.resultsBody.querySelectorAll('tr').forEach(row => {
+                const text = Array.from(row.cells).slice(0, 4).map(c => c.textContent.toLowerCase()).join(' ');
+                const isFiltered = row.dataset.filtered === 'true';
+                row.style.display = (isFiltered && ELEMENTS.arabicFilter.checked) || !text.includes(term) ? 'none' : '';
+            });
+        }
+        
+        function exportCSV() {
+            if (!STATE.results.length) return showMessage('No data to export');
+            
+            const csv = ['Tell ID,Question,Answer,Username,Profile,Active',
+                ...STATE.results.map(r => [
+                    r.id,
+                    `"${r.tell.replace(/"/g, '""')}"`,
+                    `"${r.answer.replace(/"/g, '""')}"`,
+                    `"${r.username.replace(/"/g, '""')}"`,
+                    `https://tellonym.me/${r.username}`,
+                    r.isActive === true ? 'Yes' : r.isActive === false ? 'No' : 'Unknown'
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `tellonym_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            showMessage('CSV exported!', 'success');
+        }
+        
+        ELEMENTS.settingsForm.addEventListener('submit', startFetch);
+        ELEMENTS.fetchBtn.addEventListener('click', startFetch);
+        ELEMENTS.stopBtn.addEventListener('click', stopFetch);
+        ELEMENTS.clearBtn.addEventListener('click', clearResults);
+        ELEMENTS.exportBtn.addEventListener('click', exportCSV);
+        ELEMENTS.searchInput.addEventListener('input', filterResults);
+        ELEMENTS.arabicFilter.addEventListener('change', filterResults);
+    </script>
+</body>
+</html>
