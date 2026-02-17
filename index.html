@@ -10,7 +10,7 @@ body{
   margin:16px;
 }
 
-input{
+input, select{
   padding:6px;
   margin:4px 0;
 }
@@ -23,6 +23,31 @@ button{
 label{
   display:inline-block;
   margin-top:6px;
+}
+
+.controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px 18px;
+  align-items:flex-end;
+  margin-top:10px;
+}
+
+.control-block{
+  display:flex;
+  flex-direction:column;
+}
+
+.checkbox-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:14px 18px;
+  align-items:center;
+  margin-top:10px;
+}
+
+small{
+  color:#666;
 }
 
 table{
@@ -58,8 +83,37 @@ a{
   font-weight:600;
 }
 
-small{
-  color:#666;
+.dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  display:inline-block;
+  vertical-align:middle;
+  margin-right:6px;
+}
+
+.dot.online{
+  background:#19b24a;
+  box-shadow:0 0 0 2px rgba(25,178,74,0.15);
+}
+
+.dot.offline{
+  background:#bbb;
+}
+
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  white-space:nowrap;
+}
+
+.footer-actions{
+  margin-top:12px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
 }
 </style>
 
@@ -68,26 +122,64 @@ small{
 
 <h2>Tellonym Answer Fetcher</h2>
 
-<label>Starting Answer ID</label><br>
-<input id="startId" placeholder="e.g. 6839604116"><br>
+<div class="controls">
+  <div class="control-block">
+    <label>Starting Answer ID</label>
+    <input id="startId" placeholder="e.g. 6839604116">
+  </div>
 
-<label>Number to collect</label><br>
-<input id="want" value="50"><br>
+  <div class="control-block">
+    <label>Number to collect (auto-run)</label>
+    <input id="want" value="50">
+  </div>
 
-<label>Delay between batches (ms)</label><br>
-<input id="delay" value="800"><br>
+  <div class="control-block">
+    <label>Batch size</label>
+    <select id="batchSize">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="5">5</option>
+      <option value="10" selected>10</option>
+      <option value="20">20</option>
+      <option value="30">30</option>
+      <option value="50">50</option>
+    </select>
+  </div>
 
-<label style="display:block;margin-top:10px;">
-  <input id="excludeArabic" type="checkbox">
-  Exclude Arabic characters (filter Tell + Answer after loading)
-</label>
-<small>When enabled, any row containing Arabic script in Tell or Answer will be hidden.</small>
+  <div class="control-block">
+    <label>Delay between batches (ms)</label>
+    <input id="delay" value="800">
+  </div>
 
-<br><br>
+  <div class="control-block">
+    <button onclick="start()">Start</button>
+  </div>
 
-<button onclick="start()">Start</button>
-<button onclick="stop()">Stop</button>
-<button onclick="exportCSV()">Export CSV</button>
+  <div class="control-block">
+    <button onclick="stop()">Stop</button>
+  </div>
+
+  <div class="control-block">
+    <button onclick="exportCSV()">Export CSV</button>
+  </div>
+</div>
+
+<div class="checkbox-row">
+  <label>
+    <input id="excludeArabic" type="checkbox">
+    Exclude Arabic characters (hide rows containing Arabic in Tell/Answer)
+  </label>
+
+  <label>
+    <input id="onlineOnly" type="checkbox">
+    Online only
+  </label>
+</div>
+
+<small>
+“Online” is derived from <code>user.isActive</code> / <code>user.active</code> / <code>user.online</code> / <code>user.isOnline</code> if present.
+Missing fields are treated as offline/unknown.
+</small>
 
 <div id="status"></div>
 
@@ -96,8 +188,9 @@ small{
 <tr>
 <th>ID</th>
 <th>Avatar</th>
-<th>Respondent Username</th>
-<th>Respondent Profile</th>
+<th>Respondent</th>
+<th>Profile</th>
+<th>Status</th>
 <th>Created</th>
 <th>Tell</th>
 <th>Answer</th>
@@ -107,22 +200,22 @@ small{
 <tbody id="results"></tbody>
 </table>
 
+<div class="footer-actions">
+  <button id="loadMoreBtn" onclick="loadMoreOneBatch()">Load 1 more batch</button>
+  <span id="loadMoreHint"><small>Loads the next batch starting from the next ID.</small></span>
+</div>
+
 <script>
 const WORKER = "https://blue-morning-f3e9.kol902100.workers.dev";
 const USERNAME = "AAA"; // required by the endpoint you provided
 
-const BATCH_SIZE = 20;
-
 let abort = false;
-let results = []; // keep raw results for CSV and filtering
+let results = [];         // stored raw results
+let nextId = null;        // next ID to fetch from (for "Load more")
+let running = false;      // prevent overlapping runs
 
-function sleep(ms){
-  return new Promise(r=>setTimeout(r,ms));
-}
-
-function stop(){
-  abort = true;
-}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function stop(){ abort = true; }
 
 function escapeHTML(str){
   return String(str ?? "")
@@ -132,16 +225,12 @@ function escapeHTML(str){
 }
 
 function hasArabic(text){
-  // Arabic blocks: 0600–06FF, 0750–077F, 08A0–08FF, FB50–FDFF, FE70–FEFF
-  // (includes Arabic Presentation Forms)
   return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text || "");
 }
 
-function rowShouldHide(data){
-  if(!document.getElementById("excludeArabic").checked) return false;
-  const tell = data.tell || "";
-  const answer = data.answer || "";
-  return hasArabic(tell) || hasArabic(answer);
+function getIsOnline(user){
+  const v = user?.isActive ?? user?.active ?? user?.online ?? user?.isOnline;
+  return v === true;
 }
 
 async function fetchAnswer(id){
@@ -153,7 +242,6 @@ async function fetchAnswer(id){
 
   try{
     const res = await fetch(url);
-
     if(res.status === 404) return null;
     if(!res.ok) return null;
 
@@ -167,31 +255,30 @@ async function fetchAnswer(id){
 }
 
 function avatarCandidates(user){
-  const file =
-    user?.avatarFileName ||
-    user?.avatarFilename ||
-    "";
-
+  const file = user?.avatarFileName || user?.avatarFilename || "";
   if(!file) return [];
-
   return [
     `https://userimg.tellonym.me/sm-v2/${file}`,
     `https://userimg.tellonym.me/lg-v2/${file}`,
   ];
 }
 
-function renderAllRows(){
-  const tbody = document.getElementById("results");
-  tbody.innerHTML = "";
-  for(const data of results){
-    if(rowShouldHide(data)) continue;
-    tbody.appendChild(buildRow(data));
+function rowHiddenByFilters(data){
+  if(document.getElementById("excludeArabic").checked){
+    if(hasArabic(data.tell || "") || hasArabic(data.answer || "")) return true;
   }
+
+  if(document.getElementById("onlineOnly").checked){
+    if(!getIsOnline(data.user)) return true;
+  }
+
+  return false;
 }
 
 function buildRow(data){
   const respondent = data.user?.username || "";
   const profileLink = respondent ? `https://tellonym.me/${respondent}` : "";
+  const isOnline = getIsOnline(data.user);
 
   const candidates = avatarCandidates(data.user);
   const avatarURL = candidates[0] || "";
@@ -225,6 +312,13 @@ function buildRow(data){
   }
 </td>
 
+<td>
+  <span class="badge">
+    <span class="dot ${isOnline ? "online" : "offline"}"></span>
+    ${isOnline ? "Online" : "Offline"}
+  </span>
+</td>
+
 <td>${escapeHTML(data.createdAt || "")}</td>
 <td>${escapeHTML(data.tell || "")}</td>
 <td>${escapeHTML(data.answer || "")}</td>
@@ -233,26 +327,76 @@ function buildRow(data){
   return tr;
 }
 
-document.getElementById("excludeArabic").addEventListener("change", () => {
-  // Filter once loaded (re-render without modifying the stored results)
-  renderAllRows();
-});
+function renderAllRows(){
+  const tbody = document.getElementById("results");
+  tbody.innerHTML = "";
+  for(const data of results){
+    if(rowHiddenByFilters(data)) continue;
+    tbody.appendChild(buildRow(data));
+  }
+}
 
-async function fetchBatch(startId){
-  const ids = [];
-  for(let i=0;i<BATCH_SIZE;i++){
-    ids.push(startId + i);
+document.getElementById("excludeArabic").addEventListener("change", renderAllRows);
+document.getElementById("onlineOnly").addEventListener("change", renderAllRows);
+
+function getBatchSize(){
+  const v = Number(document.getElementById("batchSize").value);
+  return Number.isFinite(v) && v > 0 ? v : 10;
+}
+
+async function fetchBatch(startId, batchSize){
+  const ids = Array.from({length: batchSize}, (_,i)=>startId+i);
+  const batch = await Promise.all(ids.map(id => fetchAnswer(id)));
+  return batch.filter(Boolean);
+}
+
+function setStatus(text){
+  document.getElementById("status").innerText = text;
+}
+
+function setLoadMoreEnabled(enabled){
+  const btn = document.getElementById("loadMoreBtn");
+  btn.disabled = !enabled;
+}
+
+async function loadMoreOneBatch(){
+  if(running) return;
+  if(nextId === null){
+    alert("Set a Starting Answer ID first, then click Start.");
+    return;
   }
 
-  // Fetch all 20 in parallel
-  const promises = ids.map(id => fetchAnswer(id));
-  const batch = await Promise.all(promises);
+  running = true;
+  setLoadMoreEnabled(false);
 
-  // Keep only non-null responses
-  return batch.filter(x => x);
+  const batchSize = getBatchSize();
+  const delay = Number(document.getElementById("delay").value);
+
+  setStatus(`Loading 1 batch (${batchSize}) from ID: ${nextId}...`);
+
+  const batchResults = await fetchBatch(nextId, batchSize);
+
+  // Store + render
+  for(const item of batchResults){
+    results.push(item);
+    if(!rowHiddenByFilters(item)){
+      document.getElementById("results").appendChild(buildRow(item));
+    }
+  }
+
+  // Advance pointer regardless of gaps
+  nextId += batchSize;
+
+  setStatus(`Loaded batch. Total stored: ${results.length}. Next ID: ${nextId}`);
+  await sleep(Math.max(0, delay));
+
+  setLoadMoreEnabled(true);
+  running = false;
 }
 
 async function start(){
+  if(running) return;
+
   abort = false;
   results = [];
   document.getElementById("results").innerHTML = "";
@@ -260,44 +404,48 @@ async function start(){
   let id = Number(document.getElementById("startId").value);
   const want = Number(document.getElementById("want").value);
   const delay = Number(document.getElementById("delay").value);
+  const batchSize = getBatchSize();
 
   if(!Number.isFinite(id) || !Number.isFinite(want) || want <= 0){
     alert("Enter a valid Starting Answer ID and Number to collect.");
     return;
   }
 
+  nextId = id; // initialize for "Load more"
+  running = true;
+  setLoadMoreEnabled(false);
+
   let collected = 0;
   let attempts = 0;
 
   while(!abort && collected < want){
-    attempts += BATCH_SIZE;
+    attempts += batchSize;
 
-    document.getElementById("status").innerText =
-      `Attempts: ${attempts} | Collected: ${collected}/${want} | Next batch from ID: ${id}`;
+    setStatus(
+      `Attempts: ${attempts} | Collected: ${collected}/${want} | Next batch from ID: ${nextId}`
+    );
 
-    const batchResults = await fetchBatch(id);
+    const batchResults = await fetchBatch(nextId, batchSize);
 
-    // Store all successful results
     for(const item of batchResults){
       if(collected >= want) break;
 
       results.push(item);
 
-      // Render row only if it passes the current filter setting
-      if(!rowShouldHide(item)){
+      if(!rowHiddenByFilters(item)){
         document.getElementById("results").appendChild(buildRow(item));
       }
 
       collected++;
     }
 
-    id += BATCH_SIZE;
-
+    nextId += batchSize;
     await sleep(delay);
   }
 
-  document.getElementById("status").innerText =
-    abort ? "Stopped." : `Done. Collected ${results.length}.`;
+  setStatus(abort ? "Stopped." : `Done. Collected ${results.length}. Next ID: ${nextId}`);
+  setLoadMoreEnabled(true);
+  running = false;
 }
 
 function exportCSV(){
@@ -306,16 +454,14 @@ function exportCSV(){
     return;
   }
 
-  // Export respects the checkbox: if checked, excluded rows are NOT exported
-  const excludeArabic = document.getElementById("excludeArabic").checked;
-
-  let csv = "ID,RespondentUsername,RespondentProfile,AvatarURL,Created,Tell,Answer\n";
+  let csv = "ID,RespondentUsername,RespondentProfile,IsOnline,AvatarURL,Created,Tell,Answer\n";
 
   for(const r of results){
-    if(excludeArabic && (hasArabic(r.tell || "") || hasArabic(r.answer || ""))) continue;
+    if(rowHiddenByFilters(r)) continue; // export respects current filters
 
     const respondent = r.user?.username || "";
     const profile = respondent ? `https://tellonym.me/${respondent}` : "";
+    const isOnline = getIsOnline(r.user);
 
     const cands = avatarCandidates(r.user);
     const avatarURL = cands[1] || cands[0] || "";
@@ -324,7 +470,7 @@ function exportCSV(){
     const answer = String(r.answer ?? "").replaceAll('"','""');
     const created = String(r.createdAt ?? "").replaceAll('"','""');
 
-    csv += `${r.id},"${respondent.replaceAll('"','""')}","${profile}","${avatarURL}","${created}","${tell}","${answer}"\n`;
+    csv += `${r.id},"${respondent.replaceAll('"','""')}","${profile}",${isOnline ? "true" : "false"},"${avatarURL}","${created}","${tell}","${answer}"\n`;
   }
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
