@@ -2,202 +2,23 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Tellonym Answer Fetcher (via Worker)</title>
+  <title>Tellonym Answer Fetcher</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 16px; }
-    input { padding: 6px; margin: 4px 0; width: 420px; max-width: 100%; }
-    button { padding: 8px 12px; margin-right: 8px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
-    th, td { border: 1px solid #ddd; padding: 6px; vertical-align: top; }
-    th { background: #f6f6f6; }
-    .row { margin-bottom: 10px; }
-    pre { background: #111; color: #ddd; padding: 10px; overflow: auto; }
-  </style>
-</head>
-<body>
-  <h2>Tellonym Answer Fetcher (via your Cloudflare Worker)</h2>
-
-  <div class="row">
-    <label>Worker URL</label><br/>
-    <input id="worker" placeholder="https://blue-morning-f3e9.kol902100.workers.dev" />
-  </div>
-
-  <div class="row">
-    <label>Username</label><br/>
-    <input id="username" placeholder="username" />
-  </div>
-
-  <div class="row">
-    <label>Starting Answer ID</label><br/>
-    <input id="startId" placeholder="e.g. 6839604116" />
-  </div>
-
-  <div class="row">
-    <label>How many successful answers to collect</label><br/>
-    <input id="want" value="50" />
-  </div>
-
-  <div class="row">
-    <label>Limit param (Tellonym API)</label><br/>
-    <input id="limit" value="24" />
-  </div>
-
-  <div class="row">
-    <label>Delay between attempts (ms)</label><br/>
-    <input id="delay" value="800" />
-  </div>
-
-  <div class="row">
-    <button id="go">Start</button>
-    <button id="stop">Stop</button>
-    <button id="csv">Export CSV</button>
-  </div>
-
-  <div id="status"></div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th><th>Created</th><th>Tell</th><th>Answer</th>
-      </tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
-
-  <h3>Debug log</h3>
-  <pre id="log"></pre>
-
-<script>
-let abort = false;
-const results = [];
-
-function log(msg) {
-  const el = document.getElementById("log");
-  el.textContent += msg + "\n";
-  el.scrollTop = el.scrollHeight;
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function toCSV(rows) {
-  const esc = (s) => `"${String(s ?? "").replaceAll('"', '""')}"`;
-  const header = ["id","createdAt","tell","answer"].map(esc).join(",");
-  const lines = rows.map(r => [r.id, r.createdAt, r.tell, r.answer].map(esc).join(","));
-  return [header, ...lines].join("\n");
-}
-
-async function fetchOne(worker, username, id, limit) {
-  const target =
-    `https://tellonym.me/api/answers/id/${id}?answerId=${id}&username=${encodeURIComponent(username)}&limit=${encodeURIComponent(limit)}`;
-
-  const url = `${worker}?target=${encodeURIComponent(target)}`;
-
-  const r = await fetch(url, { method: "GET" });
-
-  // Common cases:
-  // 200: got JSON
-  // 404: not found (skip)
-  // 429: rate limit (backoff)
-  // 403: blocked
-  if (r.status === 404) return { ok: false, skip: true, status: 404 };
-  if (r.status === 429) return { ok: false, retry: true, status: 429 };
-  if (!r.ok) {
-    const text = await r.text().catch(() => "");
-    return { ok: false, status: r.status, text };
-  }
-
-  const data = await r.json();
-  // Validate minimal shape
-  if (!data || !data.id || typeof data.answer !== "string") {
-    return { ok: false, status: 200, text: "Unexpected JSON shape" };
-  }
-  return { ok: true, data };
-}
-
-function addRow(item) {
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td>${item.id}</td>
-    <td>${item.createdAt || ""}</td>
-    <td>${(item.tell || "").replaceAll("<","&lt;")}</td>
-    <td>${(item.answer || "").replaceAll("<","&lt;")}</td>
-  `;
-  document.getElementById("rows").appendChild(tr);
-}
-
-document.getElementById("stop").onclick = () => { abort = true; };
-
-document.getElementById("go").onclick = async () => {
-  abort = false;
-  results.length = 0;
-  document.getElementById("rows").innerHTML = "";
-  document.getElementById("log").textContent = "";
-
-  const worker = document.getElementById("worker").value.trim().replace(/\/$/, "");
-  const username = document.getElementById("username").value.trim();
-  let id = Number(document.getElementById("startId").value.trim());
-  const want = Number(document.getElementById("want").value.trim());
-  const limit = Number(document.getElementById("limit").value.trim());
-  const delay = Number(document.getElementById("delay").value.trim());
-
-  if (!worker || !username || !Number.isFinite(id) || !Number.isFinite(want)) {
-    alert("Fill Worker URL, Username, Starting ID, and Want.");
-    return;
-  }
-
-  let attempts = 0;
-  let backoff = delay;
-
-  while (!abort && results.length < want) {
-    attempts++;
-    document.getElementById("status").textContent =
-      `Attempts: ${attempts} | Collected: ${results.length}/${want} | Current ID: ${id}`;
-
-    const res = await fetchOne(worker, username, id, limit);
-
-    if (res.ok) {
-      backoff = delay; // reset
-      results.push(res.data);
-      addRow(res.data);
-      log(`OK ${id} (${res.data.createdAt || "no date"})`);
-      id += 1;
-      await sleep(delay);
-      continue;
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 16px;
     }
 
-    if (res.skip) {
-      log(`SKIP ${id} (404)`);
-      id += 1;
-      await sleep(delay);
-      continue;
+    input {
+      padding: 6px;
+      margin: 4px 0;
+      width: 300px;
     }
 
-    if (res.retry) {
-      log(`RATE LIMITED ${id} (429) backing off: ${backoff}ms`);
-      await sleep(backoff);
-      backoff = Math.min(backoff * 2, 15000);
-      continue;
+    button {
+      padding: 8px 12px;
+      margin-right: 8px;
     }
 
-    // Other errors: show details and continue cautiously
-    log(`ERR ${id} status=${res.status} ${res.text ? ("| " + res.text.slice(0,200)) : ""}`);
-    id += 1;
-    await sleep(Math.max(delay, 1000));
-  }
-
-  document.getElementById("status").textContent =
-    abort ? "Stopped." : `Done. Collected ${results.length}.`;
-};
-
-document.getElementById("csv").onclick = () => {
-  if (!results.length) return alert("No results yet.");
-  const blob = new Blob([toCSV(results)], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "tellonym_answers.csv";
-  a.click();
-  URL.revokeObjectURL(a.href);
-};
-</script>
-</body>
-</html>
+    table {
+      border-collapse: c
