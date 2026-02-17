@@ -67,3 +67,202 @@ a{
 <th>ID</th>
 <th>Respondent Username</th>
 <th>Respondent Profile</th>
+<th>Created</th>
+<th>Tell</th>
+<th>Answer</th>
+</tr>
+</thead>
+
+<tbody id="results"></tbody>
+
+</table>
+
+<script>
+
+const WORKER =
+"https://blue-morning-f3e9.kol902100.workers.dev";
+
+const USERNAME =
+"AAA";
+
+let abort=false;
+let results=[];
+
+function sleep(ms){
+  return new Promise(r=>setTimeout(r,ms));
+}
+
+function stop(){
+  abort=true;
+}
+
+async function fetchAnswer(id){
+
+  const target=
+`https://tellonym.me/api/answers/id/${id}?answerId=${id}&username=${USERNAME}&limit=24`;
+
+  const url=
+`${WORKER}?target=${encodeURIComponent(target)}`;
+
+  try{
+
+    const res=await fetch(url);
+
+    if(!res.ok)
+      return null;
+
+    const data=await res.json();
+
+    if(!data || !data.id)
+      return null;
+
+    return data;
+
+  }catch{
+    return null;
+  }
+
+}
+
+function addRow(data){
+
+  const tbody=
+  document.getElementById("results");
+
+  const respondent=
+  data.user?.username || "";
+
+  const profileLink=
+  respondent
+  ? `https://tellonym.me/${respondent}`
+  : "";
+
+  const tr=
+  document.createElement("tr");
+
+  tr.innerHTML=`
+
+<td>${data.id}</td>
+
+<td>${respondent}</td>
+
+<td>
+${
+respondent
+? `<a href="${profileLink}" target="_blank">${profileLink}</a>`
+: ""
+}
+</td>
+
+<td>${data.createdAt||""}</td>
+
+<td>${escapeHTML(data.tell||"")}</td>
+
+<td>${escapeHTML(data.answer||"")}</td>
+
+`;
+
+  tbody.appendChild(tr);
+
+}
+
+function escapeHTML(str){
+
+  return str
+  .replaceAll("&","&amp;")
+  .replaceAll("<","&lt;")
+  .replaceAll(">","&gt;");
+
+}
+
+async function start(){
+
+  abort=false;
+  results=[];
+
+  document.getElementById("results").innerHTML="";
+
+  let id=
+  Number(document.getElementById("startId").value);
+
+  const want=
+  Number(document.getElementById("want").value);
+
+  const delay=
+  Number(document.getElementById("delay").value);
+
+  let collected=0;
+  let attempts=0;
+
+  while(!abort && collected<want){
+
+    attempts++;
+
+    document.getElementById("status").innerText=
+`Attempts: ${attempts} | Collected: ${collected}/${want} | Current ID: ${id}`;
+
+    const data=
+    await fetchAnswer(id);
+
+    if(data){
+
+      results.push(data);
+
+      addRow(data);
+
+      collected++;
+
+    }
+
+    id++;
+
+    await sleep(delay);
+
+  }
+
+}
+
+function exportCSV(){
+
+  if(results.length===0)
+    return;
+
+  let csv=
+`ID,RespondentUsername,RespondentProfile,Created,Tell,Answer\n`;
+
+  for(const r of results){
+
+    const respondent=
+    r.user?.username || "";
+
+    const profile=
+    respondent
+    ? `https://tellonym.me/${respondent}`
+    : "";
+
+    csv+=
+`${r.id},"${respondent}","${profile}","${r.createdAt||""}","${(r.tell||"").replaceAll('"','""')}","${(r.answer||"").replaceAll('"','""')}"\n`;
+
+  }
+
+  const blob=
+  new Blob([csv],{type:"text/csv"});
+
+  const url=
+  URL.createObjectURL(blob);
+
+  const a=
+  document.createElement("a");
+
+  a.href=url;
+  a.download="tellonym_answers.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+}
+
+</script>
+
+</body>
+</html>
