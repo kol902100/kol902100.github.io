@@ -20,6 +20,11 @@ button{
   margin-right:8px;
 }
 
+label{
+  display:inline-block;
+  margin-top:6px;
+}
+
 table{
   border-collapse:collapse;
   width:100%;
@@ -52,6 +57,10 @@ a{
   margin-top:10px;
   font-weight:600;
 }
+
+small{
+  color:#666;
+}
 </style>
 
 </head>
@@ -65,8 +74,16 @@ a{
 <label>Number to collect</label><br>
 <input id="want" value="50"><br>
 
-<label>Delay (ms)</label><br>
-<input id="delay" value="800"><br><br>
+<label>Delay between batches (ms)</label><br>
+<input id="delay" value="800"><br>
+
+<label style="display:block;margin-top:10px;">
+  <input id="excludeArabic" type="checkbox">
+  Exclude Arabic characters (filter Tell + Answer after loading)
+</label>
+<small>When enabled, any row containing Arabic script in Tell or Answer will be hidden.</small>
+
+<br><br>
 
 <button onclick="start()">Start</button>
 <button onclick="stop()">Stop</button>
@@ -94,8 +111,10 @@ a{
 const WORKER = "https://blue-morning-f3e9.kol902100.workers.dev";
 const USERNAME = "AAA"; // required by the endpoint you provided
 
+const BATCH_SIZE = 20;
+
 let abort = false;
-let results = [];
+let results = []; // keep raw results for CSV and filtering
 
 function sleep(ms){
   return new Promise(r=>setTimeout(r,ms));
@@ -112,6 +131,19 @@ function escapeHTML(str){
     .replaceAll(">","&gt;");
 }
 
+function hasArabic(text){
+  // Arabic blocks: 0600–06FF, 0750–077F, 08A0–08FF, FB50–FDFF, FE70–FEFF
+  // (includes Arabic Presentation Forms)
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text || "");
+}
+
+function rowShouldHide(data){
+  if(!document.getElementById("excludeArabic").checked) return false;
+  const tell = data.tell || "";
+  const answer = data.answer || "";
+  return hasArabic(tell) || hasArabic(answer);
+}
+
 async function fetchAnswer(id){
   const target =
     `https://tellonym.me/api/answers/id/${id}?answerId=${id}&username=${encodeURIComponent(USERNAME)}&limit=24`;
@@ -122,13 +154,10 @@ async function fetchAnswer(id){
   try{
     const res = await fetch(url);
 
-    // Many IDs will be missing → skip silently
     if(res.status === 404) return null;
-
     if(!res.ok) return null;
 
     const data = await res.json();
-
     if(!data || !data.id) return null;
 
     return data;
@@ -145,16 +174,22 @@ function avatarCandidates(user){
 
   if(!file) return [];
 
-  // Known Tellonym avatar CDN patterns (try small then large)
   return [
     `https://userimg.tellonym.me/sm-v2/${file}`,
     `https://userimg.tellonym.me/lg-v2/${file}`,
   ];
 }
 
-function addRow(data){
+function renderAllRows(){
   const tbody = document.getElementById("results");
+  tbody.innerHTML = "";
+  for(const data of results){
+    if(rowShouldHide(data)) continue;
+    tbody.appendChild(buildRow(data));
+  }
+}
 
+function buildRow(data){
   const respondent = data.user?.username || "";
   const profileLink = respondent ? `https://tellonym.me/${respondent}` : "";
 
@@ -191,13 +226,30 @@ function addRow(data){
 </td>
 
 <td>${escapeHTML(data.createdAt || "")}</td>
-
 <td>${escapeHTML(data.tell || "")}</td>
-
 <td>${escapeHTML(data.answer || "")}</td>
 `;
 
-  tbody.appendChild(tr);
+  return tr;
+}
+
+document.getElementById("excludeArabic").addEventListener("change", () => {
+  // Filter once loaded (re-render without modifying the stored results)
+  renderAllRows();
+});
+
+async function fetchBatch(startId){
+  const ids = [];
+  for(let i=0;i<BATCH_SIZE;i++){
+    ids.push(startId + i);
+  }
+
+  // Fetch all 20 in parallel
+  const promises = ids.map(id => fetchAnswer(id));
+  const batch = await Promise.all(promises);
+
+  // Keep only non-null responses
+  return batch.filter(x => x);
 }
 
 async function start(){
@@ -218,20 +270,29 @@ async function start(){
   let attempts = 0;
 
   while(!abort && collected < want){
-    attempts++;
+    attempts += BATCH_SIZE;
 
     document.getElementById("status").innerText =
-      `Attempts: ${attempts} | Collected: ${collected}/${want} | Current ID: ${id}`;
+      `Attempts: ${attempts} | Collected: ${collected}/${want} | Next batch from ID: ${id}`;
 
-    const data = await fetchAnswer(id);
+    const batchResults = await fetchBatch(id);
 
-    if(data){
-      results.push(data);
-      addRow(data);
+    // Store all successful results
+    for(const item of batchResults){
+      if(collected >= want) break;
+
+      results.push(item);
+
+      // Render row only if it passes the current filter setting
+      if(!rowShouldHide(item)){
+        document.getElementById("results").appendChild(buildRow(item));
+      }
+
       collected++;
     }
 
-    id++;
+    id += BATCH_SIZE;
+
     await sleep(delay);
   }
 
@@ -245,14 +306,18 @@ function exportCSV(){
     return;
   }
 
+  // Export respects the checkbox: if checked, excluded rows are NOT exported
+  const excludeArabic = document.getElementById("excludeArabic").checked;
+
   let csv = "ID,RespondentUsername,RespondentProfile,AvatarURL,Created,Tell,Answer\n";
 
   for(const r of results){
+    if(excludeArabic && (hasArabic(r.tell || "") || hasArabic(r.answer || ""))) continue;
+
     const respondent = r.user?.username || "";
     const profile = respondent ? `https://tellonym.me/${respondent}` : "";
 
     const cands = avatarCandidates(r.user);
-    // Prefer large for CSV
     const avatarURL = cands[1] || cands[0] || "";
 
     const tell = String(r.tell ?? "").replaceAll('"','""');
