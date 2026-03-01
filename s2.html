@@ -1,280 +1,168 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VSCO Newest Image Search</title>
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>VSCO Search — Newest First</title>
 <style>
-body {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-  margin: 20px;
-  background: #fafafa;
-}
-
-h1 {
-  margin-bottom: 10px;
-}
-
-.controls {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-input, select, button {
-  padding: 10px;
-  font-size: 16px;
-}
-
-button {
-  cursor: pointer;
-}
-
-#status {
-  margin-top: 5px;
-  color: #555;
-}
-
-#error {
-  margin-top: 10px;
-  padding: 10px;
-  background: #ffe0e0;
-  color: #900;
-  display: none;
-}
-
-.grid {
-  margin-top: 15px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.card {
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #ddd;
-}
-
-.card img {
-  width: 100%;
-  height: 220px;
-  object-fit: cover;
-}
-
-.meta {
-  padding: 8px;
-  font-size: 13px;
-}
-
-.meta a {
-  color: #0077cc;
-  text-decoration: none;
-}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:20px;background:#fafafa}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,select,button{padding:10px;font-size:16px}
+  button{cursor:pointer}
+  #status{margin-top:10px;color:#555}
+  #err{margin-top:10px;padding:10px;border:1px solid #f99;background:#fee;color:#900;display:none;white-space:pre-wrap}
+  .grid{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+  .card{background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
+  .card img{width:100%;height:220px;object-fit:cover;display:block;background:#f2f2f2}
+  .meta{padding:10px;font-size:13px;color:#444;display:grid;gap:6px}
+  .meta a{color:#06c;text-decoration:none}
 </style>
-
 </head>
 <body>
 
 <h1>VSCO Search (Newest First)</h1>
 
-<div class="controls">
-
-<input id="query" placeholder="Enter keyword (example: dogs)">
-
-<select id="pages">
-<option value="1">1 page</option>
-<option value="2" selected>2 pages</option>
-<option value="3">3 pages</option>
-<option value="5">5 pages</option>
-</select>
-
-<select id="size">
-<option value="20">20 per page</option>
-<option value="50">50 per page</option>
-<option value="100" selected>100 per page</option>
-</select>
-
-<button onclick="startSearch()">Search</button>
-<button onclick="loadMore()" id="loadMoreBtn" disabled>Load More</button>
-
+<div class="row">
+  <input id="q" placeholder="keyword (e.g. dogs)" />
+  <label>Size
+    <select id="size">
+      <option value="14" selected>14</option>
+      <option value="28">28</option>
+      <option value="56">56</option>
+    </select>
+  </label>
+  <label>Pages per fetch
+    <select id="pages">
+      <option value="1">1</option>
+      <option value="2" selected>2</option>
+      <option value="5">5</option>
+      <option value="10">10</option>
+    </select>
+  </label>
+  <button id="searchBtn">Search</button>
+  <button id="moreBtn" disabled>Load more</button>
 </div>
 
 <div id="status"></div>
-<div id="error"></div>
-
+<div id="err"></div>
 <div id="grid" class="grid"></div>
 
 <script>
+  const $q = document.getElementById("q");
+  const $size = document.getElementById("size");
+  const $pages = document.getElementById("pages");
+  const $searchBtn = document.getElementById("searchBtn");
+  const $moreBtn = document.getElementById("moreBtn");
+  const $status = document.getElementById("status");
+  const $err = document.getElementById("err");
+  const $grid = document.getElementById("grid");
 
-const WORKER_BASE = "https://snowy-flower-a769.kol902100.workers.dev";
+  let currentQuery = "";
+  let nextPage = 1;
+  let allItems = [];
 
-let currentQuery = "";
-let nextPage = 1;
-let allResults = [];
+  function showErr(msg){$err.style.display="block";$err.textContent=msg;}
+  function clearErr(){$err.style.display="none";$err.textContent="";}
 
-function showError(msg) {
-  const e = document.getElementById("error");
-  e.style.display = "block";
-  e.textContent = msg;
-}
+  function pickDate(x){
+    return x.upload_date || x.uploaded_at || x.created_at || x.published_at || x.createdAt || x.publishedAt || "";
+  }
+  function pickImg(x){
+    // v2.0 commonly returns responsive_url; keep fallbacks
+    return x.responsive_url || x.image_url || (x.image && (x.image.responsive_url || x.image.url)) || "";
+  }
+  function pickLink(x){
+    const p = x.permalink || x.link || "";
+    if (!p) return "#";
+    return p.startsWith("/") ? "https://vsco.co" + p : p;
+  }
+  function esc(s){return String(s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));}
 
-function clearError() {
-  document.getElementById("error").style.display = "none";
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, m => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    "\"":"&quot;",
-    "'":"&#39;"
-  })[m]);
-}
-
-function getImage(item) {
-  return item.responsive_url || item.image_url || "";
-}
-
-function getDate(item) {
-  return item.upload_date || item.created_at || "";
-}
-
-function getUser(item) {
-  return item.user?.username || "unknown";
-}
-
-function getLink(item) {
-  return item.permalink || "#";
-}
-
-async function fetchPage(query, page, size) {
-
-  const base = WORKER_BASE.replace(/\/+$/, "");
-  const url = `${base}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`;
-
-  console.log("Fetching:", url);
-
-  const res = await fetch(url);
-
-  if (!res.ok) {
+  async function fetchPage(query, page, size){
+    const url = `https://vsco.co/api/2.0/search/images?query=${encodeURIComponent(query)}&page=${page}&size=${size}`;
+    const res = await fetch(url, { credentials: "include" });
     const text = await res.text();
-    throw new Error("HTTP " + res.status + ": " + text);
+    if(!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0,200)}`);
+    return JSON.parse(text);
   }
 
-  return res.json();
-}
+  function render(){
+    $grid.innerHTML = allItems.map(item=>{
+      const img = pickImg(item);
+      const date = pickDate(item);
+      const link = pickLink(item);
+      return `
+        <div class="card">
+          <a href="${link}" target="_blank" rel="noopener">
+            <img loading="lazy" src="${img}" alt="">
+          </a>
+          <div class="meta">
+            <div><b>${esc(date || "(no date)")}</b></div>
+            <a href="${link}" target="_blank" rel="noopener">Open on VSCO</a>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
 
-function render() {
+  async function loadBatch(reset){
+    clearErr();
+    const query = $q.value.trim();
+    if(!query) return;
 
-  const grid = document.getElementById("grid");
+    const size = Number($size.value);
+    const pages = Number($pages.value);
 
-  grid.innerHTML = allResults.map(item => {
-
-    const img = getImage(item);
-    const date = getDate(item);
-    const user = getUser(item);
-    const link = getLink(item);
-
-    return `
-    <div class="card">
-      <a href="${link}" target="_blank">
-        <img src="${img}" loading="lazy">
-      </a>
-      <div class="meta">
-        <div><b>${escapeHtml(user)}</b></div>
-        <div>${escapeHtml(date)}</div>
-        <a href="${link}" target="_blank">open</a>
-      </div>
-    </div>
-    `;
-
-  }).join("");
-
-}
-
-async function loadBatch(reset) {
-
-  clearError();
-
-  try {
-
-    const pages = Number(document.getElementById("pages").value);
-    const size = Number(document.getElementById("size").value);
-
-    document.getElementById("status").textContent = "Loading...";
-
-    let newItems = [];
-
-    for (let i = 0; i < pages; i++) {
-
-      const json = await fetchPage(currentQuery, nextPage, size);
-
-      const results = json.results || [];
-
-      if (results.length === 0) break;
-
-      newItems.push(...results);
-
-      nextPage++;
-
+    if(reset){
+      currentQuery = query;
+      nextPage = 1;
+      allItems = [];
+      $grid.innerHTML = "";
     }
 
-    allResults.push(...newItems);
+    $searchBtn.disabled = true;
+    $moreBtn.disabled = true;
+    $status.textContent = "Loading…";
 
-    allResults.sort((a, b) =>
-      new Date(getDate(b)) - new Date(getDate(a))
-    );
+    try{
+      const newly = [];
+      for(let i=0;i<pages;i++){
+        const p = nextPage + i;
+        const json = await fetchPage(currentQuery, p, size);
+        const items = json.results || json.items || [];
+        if(items.length === 0) break;
+        newly.push(...items);
+      }
 
-    render();
+      nextPage += pages;
 
-    document.getElementById("status").textContent =
-      allResults.length + " results";
+      allItems.push(...newly);
 
-    document.getElementById("loadMoreBtn").disabled = false;
+      // sort newest first (string parse)
+      allItems.sort((a,b)=> (Date.parse(pickDate(b))||0) - (Date.parse(pickDate(a))||0));
 
+      render();
+      $status.textContent = `${allItems.length} images (sorted newest → oldest).`;
+      $moreBtn.disabled = allItems.length === 0;
+    }catch(e){
+      showErr(
+        e.message + "\n\n" +
+        "If this is a CORS error when running as a standalone site, use the Tampermonkey-on-vsco.co version instead."
+      );
+      $status.textContent = "";
+    }finally{
+      $searchBtn.disabled = false;
+    }
   }
-  catch (err) {
 
-    showError(err.message);
+  $searchBtn.onclick = () => loadBatch(true);
+  $moreBtn.onclick = () => loadBatch(false);
+  $q.addEventListener("keydown", e => { if(e.key === "Enter") loadBatch(true); });
 
-  }
-
-}
-
-function startSearch() {
-
-  const q = document.getElementById("query").value.trim();
-
-  if (!q) return;
-
-  currentQuery = q;
-
-  nextPage = 1;
-  allResults = [];
-
-  document.getElementById("grid").innerHTML = "";
-
-  loadBatch(true);
-
-}
-
-function loadMore() {
-
-  loadBatch(false);
-
-}
-
-document.getElementById("query").addEventListener("keypress", function(e) {
-
-  if (e.key === "Enter") startSearch();
-
-});
-
+  // optional: prefill from URL if you host it with ?q=dogs
+  const u = new URL(location.href);
+  const q0 = u.searchParams.get("q");
+  if(q0){ $q.value = q0; }
 </script>
 
 </body>
