@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VSCO Newest Image Search</title>
+
+<style>
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  margin: 20px;
+  background: #fafafa;
+}
+
+h1 {
+  margin-bottom: 10px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+input, select, button {
+  padding: 10px;
+  font-size: 16px;
+}
+
+button {
+  cursor: pointer;
+}
+
+#status {
+  margin-top: 5px;
+  color: #555;
+}
+
+#error {
+  margin-top: 10px;
+  padding: 10px;
+  background: #ffe0e0;
+  color: #900;
+  display: none;
+}
+
+.grid {
+  margin-top: 15px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+}
+
+.card img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+}
+
+.meta {
+  padding: 8px;
+  font-size: 13px;
+}
+
+.meta a {
+  color: #0077cc;
+  text-decoration: none;
+}
+</style>
+
+</head>
+<body>
+
+<h1>VSCO Search (Newest First)</h1>
+
+<div class="controls">
+
+<input id="query" placeholder="Enter keyword (example: dogs)">
+
+<select id="pages">
+<option value="1">1 page</option>
+<option value="2" selected>2 pages</option>
+<option value="3">3 pages</option>
+<option value="5">5 pages</option>
+</select>
+
+<select id="size">
+<option value="20">20 per page</option>
+<option value="50">50 per page</option>
+<option value="100" selected>100 per page</option>
+</select>
+
+<button onclick="startSearch()">Search</button>
+<button onclick="loadMore()" id="loadMoreBtn" disabled>Load More</button>
+
+</div>
+
+<div id="status"></div>
+<div id="error"></div>
+
+<div id="grid" class="grid"></div>
+
+<script>
+
+const WORKER_BASE = "https://snowy-flower-a769.kol902100.workers.dev";
+
+let currentQuery = "";
+let nextPage = 1;
+let allResults = [];
+
+function showError(msg) {
+  const e = document.getElementById("error");
+  e.style.display = "block";
+  e.textContent = msg;
+}
+
+function clearError() {
+  document.getElementById("error").style.display = "none";
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, m => ({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    "\"":"&quot;",
+    "'":"&#39;"
+  })[m]);
+}
+
+function getImage(item) {
+  return item.responsive_url || item.image_url || "";
+}
+
+function getDate(item) {
+  return item.upload_date || item.created_at || "";
+}
+
+function getUser(item) {
+  return item.user?.username || "unknown";
+}
+
+function getLink(item) {
+  return item.permalink || "#";
+}
+
+async function fetchPage(query, page, size) {
+
+  const base = WORKER_BASE.replace(/\/+$/, "");
+  const url = `${base}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`;
+
+  console.log("Fetching:", url);
+
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("HTTP " + res.status + ": " + text);
+  }
+
+  return res.json();
+}
+
+function render() {
+
+  const grid = document.getElementById("grid");
+
+  grid.innerHTML = allResults.map(item => {
+
+    const img = getImage(item);
+    const date = getDate(item);
+    const user = getUser(item);
+    const link = getLink(item);
+
+    return `
+    <div class="card">
+      <a href="${link}" target="_blank">
+        <img src="${img}" loading="lazy">
+      </a>
+      <div class="meta">
+        <div><b>${escapeHtml(user)}</b></div>
+        <div>${escapeHtml(date)}</div>
+        <a href="${link}" target="_blank">open</a>
+      </div>
+    </div>
+    `;
+
+  }).join("");
+
+}
+
+async function loadBatch(reset) {
+
+  clearError();
+
+  try {
+
+    const pages = Number(document.getElementById("pages").value);
+    const size = Number(document.getElementById("size").value);
+
+    document.getElementById("status").textContent = "Loading...";
+
+    let newItems = [];
+
+    for (let i = 0; i < pages; i++) {
+
+      const json = await fetchPage(currentQuery, nextPage, size);
+
+      const results = json.results || [];
+
+      if (results.length === 0) break;
+
+      newItems.push(...results);
+
+      nextPage++;
+
+    }
+
+    allResults.push(...newItems);
+
+    allResults.sort((a, b) =>
+      new Date(getDate(b)) - new Date(getDate(a))
+    );
+
+    render();
+
+    document.getElementById("status").textContent =
+      allResults.length + " results";
+
+    document.getElementById("loadMoreBtn").disabled = false;
+
+  }
+  catch (err) {
+
+    showError(err.message);
+
+  }
+
+}
+
+function startSearch() {
+
+  const q = document.getElementById("query").value.trim();
+
+  if (!q) return;
+
+  currentQuery = q;
+
+  nextPage = 1;
+  allResults = [];
+
+  document.getElementById("grid").innerHTML = "";
+
+  loadBatch(true);
+
+}
+
+function loadMore() {
+
+  loadBatch(false);
+
+}
+
+document.getElementById("query").addEventListener("keypress", function(e) {
+
+  if (e.key === "Enter") startSearch();
+
+});
+
+</script>
+
+</body>
+</html>
