@@ -120,7 +120,7 @@
   }
 
  async function fetchPage(query, page, size) {
-  const WORKER_BASE = "https://snowy-flower-a769.kol902100.workers.dev/"; // <- change this
+  const WORKER_BASE = "https://snowy-flower-a769.kol902100.workers.dev"; // <- change this
   const url = `${WORKER_BASE}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} from proxy`);
