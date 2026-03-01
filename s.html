@@ -119,12 +119,12 @@
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  async function fetchPage(query, page, size) {
-    // Internal endpoint discovered via DevTools Network on VSCO search
-    const url = `https://vsco.co/api/3.0/search/images?query=${encodeURIComponent(query)}&page=${page}&size=${size}`;
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) throw new Error(`HTTP ${res.status} from VSCO`);
-    return res.json();
+ async function fetchPage(query, page, size) {
+  const WORKER_BASE = "https://snowy-flower-a769.kol902100.workers.dev/"; // <- change this
+  const url = `${WORKER_BASE}/api/search?query=${encodeURIComponent(query)}&page=${page}&size=${size}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} from proxy`);
+  return res.json();
   }
 
   async function doSearch(reset) {
