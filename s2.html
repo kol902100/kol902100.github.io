@@ -2,9 +2,9 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>VSCO Search Viewer</title>
+<title>VSCO Search Viewer (Proxy)</title>
 <style>
-body { font-family: system-ui; margin: 20px; background: #f5f5f5; }
+body { font-family: system-ui, sans-serif; margin: 20px; background: #f5f5f5; }
 .controls { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; }
 input, select, button { padding:8px; font-size:14px; }
 .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:15px; }
@@ -18,14 +18,14 @@ input, select, button { padding:8px; font-size:14px; }
 </head>
 <body>
 
-<h2>VSCO Search Viewer</h2>
+<h2>VSCO Search Viewer (using Proxy)</h2>
 
 <div class="controls">
 <input id="query" placeholder="Search keyword">
 <input id="target" type="number" value="1200" min="1">
 <select id="sort">
-<option value="objectId">Sort: ObjectId time (66..)</option>
-<option value="date">Sort: API date</option>
+<option value="objectId">Sort: ObjectId time</option>
+<option value="date">Sort: Best date</option>
 <option value="none">No sort</option>
 </select>
 <input id="filter" placeholder="Filter loaded (e.g. 66cf or maya)">
@@ -37,7 +37,7 @@ input, select, button { padding:8px; font-size:14px; }
 <div class="grid" id="grid"></div>
 
 <script>
-const API = "https://vsco.co/api/2.0/search/images";
+const PROXY = "https://snowy-flower-a769.kol902100.workers.dev";
 
 let allItems = [];
 let nextPage = 1;
@@ -53,7 +53,8 @@ function objectIdMs(id){
 
 function iso(ms){
   if(!ms) return "";
-  return new Date(ms).toISOString();
+  const d = new Date(ms);
+  return isNaN(d.getTime()) ? "" : d.toISOString();
 }
 
 function buildMediaUrl(item){
@@ -67,7 +68,8 @@ function thumb(item){
 }
 
 function fullImg(item){
-  if(item.original_url) return item.original_url;
+  const direct = item.original_url || item.full_url;
+  if(direct) return direct;
   let t = thumb(item);
   return t.replace(/-\d+\.(jpg|jpeg|png|webp)/i,".$1");
 }
@@ -93,7 +95,7 @@ function applySort(items){
     return [...items].sort((a,b)=>objectIdMs(b.id)-objectIdMs(a.id));
   }
   if(mode==="date"){
-    return [...items].sort((a,b)=>Date.parse(b.published_at||0)-Date.parse(a.published_at||0));
+    return [...items].sort((a,b)=>(Date.parse(b.published_at||0) - Date.parse(a.published_at||0)));
   }
   return items;
 }
@@ -106,7 +108,7 @@ function render(){
   grid.innerHTML = items.map(item=>{
     let date = document.getElementById("sort").value==="objectId"
       ? iso(objectIdMs(item.id))
-      : item.published_at || "";
+      : (item.published_at || "");
 
     return `
       <div class="card">
@@ -126,11 +128,12 @@ function render(){
     `;
   }).join("");
 
-  setStatus(`${items.length} shown of ${allItems.length} loaded`);
+  setStatus(`${items.length} shown (of ${allItems.length} loaded)`);
 }
 
 async function fetchPage(page){
-  const res = await fetch(`${API}?query=${encodeURIComponent(currentQuery)}&page=${page}&size=30`);
+  const url = `${PROXY}?query=${encodeURIComponent(currentQuery)}&page=${page}&size=30`;
+  const res = await fetch(url);
   const json = await res.json();
   return json.results || [];
 }
@@ -168,7 +171,6 @@ async function loadToTarget(){
 
 document.getElementById("filter").addEventListener("input",render);
 document.getElementById("sort").addEventListener("change",render);
-
 </script>
 
 </body>
