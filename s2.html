@@ -1,168 +1,174 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>VSCO Search — Newest First</title>
+<meta charset="UTF-8">
+<title>VSCO Search Viewer</title>
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:20px;background:#fafafa}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  input,select,button{padding:10px;font-size:16px}
-  button{cursor:pointer}
-  #status{margin-top:10px;color:#555}
-  #err{margin-top:10px;padding:10px;border:1px solid #f99;background:#fee;color:#900;display:none;white-space:pre-wrap}
-  .grid{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-  .card{background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
-  .card img{width:100%;height:220px;object-fit:cover;display:block;background:#f2f2f2}
-  .meta{padding:10px;font-size:13px;color:#444;display:grid;gap:6px}
-  .meta a{color:#06c;text-decoration:none}
+body { font-family: system-ui; margin: 20px; background: #f5f5f5; }
+.controls { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; }
+input, select, button { padding:8px; font-size:14px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:15px; }
+.card { background:#fff; border-radius:12px; overflow:hidden; border:1px solid #ddd; }
+.card img { width:100%; height:240px; object-fit:cover; display:block; }
+.meta { padding:10px; font-size:12px; }
+.meta b { display:block; margin-bottom:5px; }
+.links a { margin-right:10px; text-decoration:none; color:#0066cc; }
+.status { font-size:13px; margin-bottom:10px; }
 </style>
 </head>
 <body>
 
-<h1>VSCO Search (Newest First)</h1>
+<h2>VSCO Search Viewer</h2>
 
-<div class="row">
-  <input id="q" placeholder="keyword (e.g. dogs)" />
-  <label>Size
-    <select id="size">
-      <option value="14" selected>14</option>
-      <option value="28">28</option>
-      <option value="56">56</option>
-    </select>
-  </label>
-  <label>Pages per fetch
-    <select id="pages">
-      <option value="1">1</option>
-      <option value="2" selected>2</option>
-      <option value="5">5</option>
-      <option value="10">10</option>
-    </select>
-  </label>
-  <button id="searchBtn">Search</button>
-  <button id="moreBtn" disabled>Load more</button>
+<div class="controls">
+<input id="query" placeholder="Search keyword">
+<input id="target" type="number" value="1200" min="1">
+<select id="sort">
+<option value="objectId">Sort: ObjectId time (66..)</option>
+<option value="date">Sort: API date</option>
+<option value="none">No sort</option>
+</select>
+<input id="filter" placeholder="Filter loaded (e.g. 66cf or maya)">
+<button onclick="startSearch()">Search</button>
+<button onclick="loadToTarget()">Load to Target</button>
 </div>
 
-<div id="status"></div>
-<div id="err"></div>
-<div id="grid" class="grid"></div>
+<div class="status" id="status"></div>
+<div class="grid" id="grid"></div>
 
 <script>
-  const $q = document.getElementById("q");
-  const $size = document.getElementById("size");
-  const $pages = document.getElementById("pages");
-  const $searchBtn = document.getElementById("searchBtn");
-  const $moreBtn = document.getElementById("moreBtn");
-  const $status = document.getElementById("status");
-  const $err = document.getElementById("err");
-  const $grid = document.getElementById("grid");
+const API = "https://vsco.co/api/2.0/search/images";
 
-  let currentQuery = "";
-  let nextPage = 1;
-  let allItems = [];
+let allItems = [];
+let nextPage = 1;
+let currentQuery = "";
+let loading = false;
 
-  function showErr(msg){$err.style.display="block";$err.textContent=msg;}
-  function clearErr(){$err.style.display="none";$err.textContent="";}
+function setStatus(t){ document.getElementById("status").innerText = t; }
 
-  function pickDate(x){
-    return x.upload_date || x.uploaded_at || x.created_at || x.published_at || x.createdAt || x.publishedAt || "";
+function objectIdMs(id){
+  if(!/^[0-9a-fA-F]{24}$/.test(id)) return 0;
+  return parseInt(id.slice(0,8),16)*1000;
+}
+
+function iso(ms){
+  if(!ms) return "";
+  return new Date(ms).toISOString();
+}
+
+function buildMediaUrl(item){
+  if(item.username && item.id)
+    return `https://vsco.co/${item.username}/media/${item.id}`;
+  return item.permalink || "";
+}
+
+function thumb(item){
+  return item.responsive_url || item.image_url || "";
+}
+
+function fullImg(item){
+  if(item.original_url) return item.original_url;
+  let t = thumb(item);
+  return t.replace(/-\d+\.(jpg|jpeg|png|webp)/i,".$1");
+}
+
+function caption(item){
+  return item.caption || item.description || "";
+}
+
+function applyFilter(items){
+  let f = document.getElementById("filter").value.toLowerCase();
+  if(!f) return items;
+  return items.filter(x =>
+    (x.id||"").toLowerCase().includes(f) ||
+    (x.username||"").toLowerCase().includes(f) ||
+    caption(x).toLowerCase().includes(f) ||
+    thumb(x).toLowerCase().includes(f)
+  );
+}
+
+function applySort(items){
+  let mode = document.getElementById("sort").value;
+  if(mode==="objectId"){
+    return [...items].sort((a,b)=>objectIdMs(b.id)-objectIdMs(a.id));
   }
-  function pickImg(x){
-    // v2.0 commonly returns responsive_url; keep fallbacks
-    return x.responsive_url || x.image_url || (x.image && (x.image.responsive_url || x.image.url)) || "";
+  if(mode==="date"){
+    return [...items].sort((a,b)=>Date.parse(b.published_at||0)-Date.parse(a.published_at||0));
   }
-  function pickLink(x){
-    const p = x.permalink || x.link || "";
-    if (!p) return "#";
-    return p.startsWith("/") ? "https://vsco.co" + p : p;
-  }
-  function esc(s){return String(s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));}
+  return items;
+}
 
-  async function fetchPage(query, page, size){
-    const url = `https://vsco.co/api/2.0/search/images?query=${encodeURIComponent(query)}&page=${page}&size=${size}`;
-    const res = await fetch(url, { credentials: "include" });
-    const text = await res.text();
-    if(!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0,200)}`);
-    return JSON.parse(text);
-  }
+function render(){
+  let items = applyFilter(allItems);
+  items = applySort(items);
 
-  function render(){
-    $grid.innerHTML = allItems.map(item=>{
-      const img = pickImg(item);
-      const date = pickDate(item);
-      const link = pickLink(item);
-      return `
-        <div class="card">
-          <a href="${link}" target="_blank" rel="noopener">
-            <img loading="lazy" src="${img}" alt="">
-          </a>
-          <div class="meta">
-            <div><b>${esc(date || "(no date)")}</b></div>
-            <a href="${link}" target="_blank" rel="noopener">Open on VSCO</a>
+  const grid = document.getElementById("grid");
+  grid.innerHTML = items.map(item=>{
+    let date = document.getElementById("sort").value==="objectId"
+      ? iso(objectIdMs(item.id))
+      : item.published_at || "";
+
+    return `
+      <div class="card">
+        <a href="${buildMediaUrl(item)}" target="_blank">
+          <img src="${thumb(item)}">
+        </a>
+        <div class="meta">
+          <b>${date}</b>
+          @${item.username||""} • ${item.id||""}
+          <div>${caption(item)||""}</div>
+          <div class="links">
+            <a href="${buildMediaUrl(item)}" target="_blank">Open page</a>
+            <a href="${fullImg(item)}" target="_blank">Full image</a>
           </div>
         </div>
-      `;
-    }).join("");
+      </div>
+    `;
+  }).join("");
+
+  setStatus(`${items.length} shown of ${allItems.length} loaded`);
+}
+
+async function fetchPage(page){
+  const res = await fetch(`${API}?query=${encodeURIComponent(currentQuery)}&page=${page}&size=30`);
+  const json = await res.json();
+  return json.results || [];
+}
+
+async function startSearch(){
+  currentQuery = document.getElementById("query").value.trim();
+  if(!currentQuery) return;
+
+  allItems = [];
+  nextPage = 1;
+  setStatus("Searching...");
+  await loadChunk();
+}
+
+async function loadChunk(){
+  if(loading) return;
+  loading = true;
+  const items = await fetchPage(nextPage);
+  allItems.push(...items);
+  nextPage++;
+  render();
+  loading = false;
+}
+
+async function loadToTarget(){
+  let target = parseInt(document.getElementById("target").value)||1200;
+  setStatus("Loading to target...");
+  while(allItems.length < target){
+    let before = allItems.length;
+    await loadChunk();
+    if(allItems.length === before) break; // no more results
   }
+  setStatus("Done.");
+}
 
-  async function loadBatch(reset){
-    clearErr();
-    const query = $q.value.trim();
-    if(!query) return;
+document.getElementById("filter").addEventListener("input",render);
+document.getElementById("sort").addEventListener("change",render);
 
-    const size = Number($size.value);
-    const pages = Number($pages.value);
-
-    if(reset){
-      currentQuery = query;
-      nextPage = 1;
-      allItems = [];
-      $grid.innerHTML = "";
-    }
-
-    $searchBtn.disabled = true;
-    $moreBtn.disabled = true;
-    $status.textContent = "Loading…";
-
-    try{
-      const newly = [];
-      for(let i=0;i<pages;i++){
-        const p = nextPage + i;
-        const json = await fetchPage(currentQuery, p, size);
-        const items = json.results || json.items || [];
-        if(items.length === 0) break;
-        newly.push(...items);
-      }
-
-      nextPage += pages;
-
-      allItems.push(...newly);
-
-      // sort newest first (string parse)
-      allItems.sort((a,b)=> (Date.parse(pickDate(b))||0) - (Date.parse(pickDate(a))||0));
-
-      render();
-      $status.textContent = `${allItems.length} images (sorted newest → oldest).`;
-      $moreBtn.disabled = allItems.length === 0;
-    }catch(e){
-      showErr(
-        e.message + "\n\n" +
-        "If this is a CORS error when running as a standalone site, use the Tampermonkey-on-vsco.co version instead."
-      );
-      $status.textContent = "";
-    }finally{
-      $searchBtn.disabled = false;
-    }
-  }
-
-  $searchBtn.onclick = () => loadBatch(true);
-  $moreBtn.onclick = () => loadBatch(false);
-  $q.addEventListener("keydown", e => { if(e.key === "Enter") loadBatch(true); });
-
-  // optional: prefill from URL if you host it with ?q=dogs
-  const u = new URL(location.href);
-  const q0 = u.searchParams.get("q");
-  if(q0){ $q.value = q0; }
 </script>
 
 </body>
