@@ -1,0 +1,389 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TikTok Sound Collector</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f7f7f7;
+      color: #111;
+    }
+
+    input, button, select {
+      padding: 9px;
+      margin: 4px;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .box {
+      background: white;
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #status {
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .card img {
+      width: 100%;
+      border-radius: 8px;
+      background: #ddd;
+      aspect-ratio: 9 / 16;
+      object-fit: cover;
+    }
+
+    .meta {
+      font-size: 13px;
+      line-height: 1.35;
+      margin-top: 6px;
+    }
+
+    .desc {
+      margin-top: 6px;
+      font-size: 13px;
+      max-height: 52px;
+      overflow: auto;
+    }
+
+    .small {
+      font-size: 12px;
+      color: #666;
+    }
+
+    a {
+      color: #0a58ca;
+    }
+  </style>
+</head>
+<body>
+  <h1>TikTok Sound Collector</h1>
+
+  <div class="box">
+    <div class="row">
+      <input id="worker" size="46" placeholder="Worker URL" value="https://green-lake-673a.kol902100.workers.dev/">
+      <input id="soundUrl" size="60" placeholder="TikTok sound URL, e.g. https://www.tiktok.com/music/name-123">
+      <button onclick="resolveSound()">Resolve sound</button>
+    </div>
+
+    <div class="row">
+      <input id="musicId" size="24" placeholder="music ID">
+      <select id="batchSize">
+        <option value="10">10 per batch</option>
+        <option value="20">20 per batch</option>
+        <option value="30" selected>30 per batch</option>
+        <option value="35">35 per batch</option>
+      </select>
+      <button onclick="loadNext()">Load next batch</button>
+      <button onclick="autoLoad()">Auto-load</button>
+      <button onclick="stopAuto()">Stop</button>
+      <button onclick="exportCsv()">Export CSV</button>
+      <button onclick="clearAll()">Clear saved</button>
+    </div>
+
+    <div class="row">
+      <input id="filter" size="40" placeholder="Filter loaded results by username/caption" oninput="render()">
+      <select id="sort" onchange="render()">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="views">Most views</option>
+        <option value="likes">Most likes</option>
+      </select>
+    </div>
+
+    <div id="status">Ready.</div>
+    <div class="small" id="stats"></div>
+  </div>
+
+  <div id="results" class="grid"></div>
+
+<script>
+let state = {
+  musicId: "",
+  cursor: "0",
+  hasMore: true,
+  loading: false,
+  auto: false,
+  items: {},
+};
+
+const STORAGE_KEY = "tt_sound_collector_v1";
+
+loadState();
+render();
+
+function getWorker() {
+  return document.getElementById("worker").value.replace(/\/$/, "");
+}
+
+function setStatus(msg) {
+  document.getElementById("status").textContent = msg;
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (saved) state = saved;
+  } catch {}
+
+  document.getElementById("musicId").value = state.musicId || "";
+}
+
+async function resolveSound() {
+  const worker = getWorker();
+  const soundUrl = document.getElementById("soundUrl").value.trim();
+
+  if (!worker || !soundUrl) {
+    setStatus("Enter Worker URL and TikTok sound URL.");
+    return;
+  }
+
+  setStatus("Resolving sound URL...");
+
+  const res = await fetch(`${worker}/resolve?url=${encodeURIComponent(soundUrl)}`);
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    setStatus("Resolve failed: " + (data.error || res.status));
+    return;
+  }
+
+  state.musicId = data.musicId;
+  state.cursor = "0";
+  state.hasMore = true;
+  state.items = {};
+
+  document.getElementById("musicId").value = data.musicId;
+
+  saveState();
+  render();
+
+  setStatus(`Resolved music ID: ${data.musicId}${data.title ? " — " + data.title : ""}`);
+}
+
+async function loadNext() {
+  if (state.loading) return;
+
+  const worker = getWorker();
+  const musicId = document.getElementById("musicId").value.trim();
+  const count = document.getElementById("batchSize").value;
+
+  if (!worker || !musicId) {
+    setStatus("Enter Worker URL and music ID.");
+    return;
+  }
+
+  state.musicId = musicId;
+
+  if (!state.hasMore) {
+    setStatus("No more results reported by TikTok.");
+    return;
+  }
+
+  state.loading = true;
+  setStatus(`Loading cursor ${state.cursor || "0"}...`);
+
+  try {
+    const url = `${worker}/music?musicId=${encodeURIComponent(musicId)}&cursor=${encodeURIComponent(state.cursor || "0")}&count=${count}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      setStatus("Load failed: " + (data.error || res.status) + (data.preview ? " — " + data.preview.slice(0, 120) : ""));
+      state.auto = false;
+      return;
+    }
+
+    let added = 0;
+
+    for (const item of data.items || []) {
+      if (!state.items[item.id]) {
+        state.items[item.id] = item;
+        added++;
+      }
+    }
+
+    if (data.cursor !== null && data.cursor !== undefined) {
+      state.cursor = String(data.cursor);
+    } else {
+      const current = Number(state.cursor || 0);
+      state.cursor = String(current + Number(count));
+    }
+
+    state.hasMore = Boolean(data.hasMore);
+    saveState();
+    render();
+
+    setStatus(`Loaded ${data.rawCount || 0}, added ${added}. Total saved: ${Object.keys(state.items).length}. Cursor: ${state.cursor}. Has more: ${state.hasMore}`);
+
+    if (state.auto && state.hasMore) {
+      await sleep(1800 + Math.random() * 1200);
+      loadNext();
+    } else {
+      state.auto = false;
+    }
+  } catch (err) {
+    setStatus("Error: " + err.message);
+    state.auto = false;
+  } finally {
+    state.loading = false;
+  }
+}
+
+function autoLoad() {
+  state.auto = true;
+  loadNext();
+}
+
+function stopAuto() {
+  state.auto = false;
+  setStatus("Stopped. Saved results remain available.");
+}
+
+function render() {
+  const filter = document.getElementById("filter").value.toLowerCase();
+  const sort = document.getElementById("sort").value;
+
+  let items = Object.values(state.items || {});
+
+  if (filter) {
+    items = items.filter(x =>
+      String(x.username || "").toLowerCase().includes(filter) ||
+      String(x.nickname || "").toLowerCase().includes(filter) ||
+      String(x.desc || "").toLowerCase().includes(filter)
+    );
+  }
+
+  items.sort((a, b) => {
+    if (sort === "oldest") return Number(a.createTime || 0) - Number(b.createTime || 0);
+    if (sort === "views") return Number(b.views || 0) - Number(a.views || 0);
+    if (sort === "likes") return Number(b.likes || 0) - Number(a.likes || 0);
+    return Number(b.createTime || 0) - Number(a.createTime || 0);
+  });
+
+  document.getElementById("stats").textContent =
+    `Music ID: ${state.musicId || "none"} | Saved: ${Object.keys(state.items || {}).length} | Showing: ${items.length} | Cursor: ${state.cursor || "0"} | Has more: ${state.hasMore}`;
+
+  const html = items.slice(0, 1000).map(item => {
+    const date = item.createTime
+      ? new Date(Number(item.createTime) * 1000).toLocaleString()
+      : "";
+
+    return `
+      <div class="card">
+        ${item.cover ? `<img src="${escapeAttr(item.cover)}" loading="lazy">` : ""}
+        <div class="meta">
+          <b>@${escapeHtml(item.username || "unknown")}</b><br>
+          ${escapeHtml(date)}<br>
+          Views: ${num(item.views)} | Likes: ${num(item.likes)}<br>
+          <a href="${escapeAttr(item.videoUrl)}" target="_blank">Open video</a>
+          ${item.authorUrl ? ` | <a href="${escapeAttr(item.authorUrl)}" target="_blank">Profile</a>` : ""}
+        </div>
+        <div class="desc">${escapeHtml(item.desc || "")}</div>
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("results").innerHTML = html;
+}
+
+function exportCsv() {
+  const rows = Object.values(state.items || {});
+  const headers = [
+    "id", "username", "nickname", "desc", "createTime", "date",
+    "views", "likes", "comments", "shares", "videoUrl", "authorUrl", "musicId", "musicTitle"
+  ];
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(item => {
+      const date = item.createTime ? new Date(Number(item.createTime) * 1000).toISOString() : "";
+      return headers.map(h => {
+        const val = h === "date" ? date : item[h];
+        return `"${String(val ?? "").replace(/"/g, '""')}"`;
+      }).join(",");
+    })
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `tiktok-music-${state.musicId || "export"}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function clearAll() {
+  if (!confirm("Clear saved results?")) return;
+  state = {
+    musicId: "",
+    cursor: "0",
+    hasMore: true,
+    loading: false,
+    auto: false,
+    items: {},
+  };
+  localStorage.removeItem(STORAGE_KEY);
+  document.getElementById("musicId").value = "";
+  render();
+  setStatus("Cleared.");
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function num(n) {
+  return Number(n || 0).toLocaleString();
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  }[c]));
+}
+
+function escapeAttr(s) {
+  return escapeHtml(s);
+}
+</script>
+</body>
+</html>
