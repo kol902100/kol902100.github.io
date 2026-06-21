@@ -148,6 +148,14 @@ a{
 
   <div class="control-block">
     <label>Delay between batches (ms)</label>
+<label>Speed:
+  <select id="speedMode">
+    <option value="sequential">Safe (1 at a time, 200ms gap)</option>
+    <option value="balanced" selected>Balanced (3 at a time, 150ms gap)</option>
+    <option value="fast">Fast (5 at a time, 50ms gap)</option>
+    <option value="full">Full speed (all at once)</option>
+  </select>
+</label>
     <input id="delay" value="800">
   </div>
 
@@ -326,12 +334,21 @@ function getBatchSize(){
 }
 
 async function fetchBatch(startId, batchSize){
+  const mode = document.getElementById("speedMode").value;
+  const configs = {
+    sequential: { concurrency: 1,         gap: 200 },
+    balanced:   { concurrency: 3,         gap: 150 },
+    fast:       { concurrency: 5,         gap: 50  },
+    full:       { concurrency: batchSize, gap: 0   },
+  };
+  const { concurrency, gap } = configs[mode] || configs.balanced;
   const batchResults = [];
-  for(let i = 0; i < batchSize; i++){
+  for(let i = 0; i < batchSize; i += concurrency){
     if(abort) break;
-    const data = await fetchAnswer(startId + i);
-    if(data) batchResults.push(data);
-    if(i < batchSize - 1) await sleep(150); // 150ms stagger within batch
+    const ids = Array.from({length: Math.min(concurrency, batchSize - i)}, (_, j) => startId + i + j);
+    const results = await Promise.all(ids.map(id => fetchAnswer(id)));
+    results.filter(Boolean).forEach(d => batchResults.push(d));
+    if(i + concurrency < batchSize && gap > 0) await sleep(gap);
   }
   return batchResults;
 }
