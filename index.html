@@ -266,6 +266,65 @@ async function fetchAnswer(id, retries = 4){
 
 // Sequential batch — fires requests one at a time with a small gap.
 // Prevents bursting all IDs at once and triggering Tellonym rate limits.
+function avatarCandidates(user){
+  const file = user?.avatarFileName || user?.avatarFilename || "";
+  if(!file) return [];
+  return [
+    `https://userimg.tellonym.me/sm-v2/${file}`,
+    `https://userimg.tellonym.me/lg-v2/${file}`,
+  ];
+}
+
+function rowHiddenByFilters(data){
+  if(document.getElementById("excludeArabic").checked){
+    if(hasArabic(data.tell || "") || hasArabic(data.answer || "")) return true;
+  }
+  if(document.getElementById("onlineOnly").checked){
+    if(!getIsOnline(data.user)) return true;
+  }
+  return false;
+}
+
+function buildRow(data){
+  const respondent = data.user?.username || "";
+  const profileLink = respondent ? `https://tellonym.me/${respondent}` : "";
+  const isOnline = getIsOnline(data.user);
+  const candidates = avatarCandidates(data.user);
+  const avatarURL = candidates[0] || "";
+  const fallbackURL = candidates[1] || "";
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+<td>${data.id}</td>
+<td>
+  ${avatarURL ? `<a href="${profileLink || '#'}" target="_blank" rel="noopener"><img class="avatar" src="${avatarURL}" onerror="this.onerror=null; this.src='${fallbackURL}'" alt=""></a>` : ""}
+</td>
+<td>${escapeHTML(respondent)}</td>
+<td>${profileLink ? `<a href="${profileLink}" target="_blank" rel="noopener">${profileLink}</a>` : ""}</td>
+<td><span class="badge"><span class="dot ${isOnline ? "online" : "offline"}"></span>${isOnline ? "Online" : "Offline"}</span></td>
+<td>${escapeHTML(data.createdAt || "")}</td>
+<td>${escapeHTML(data.tell || "")}</td>
+<td>${escapeHTML(data.answer || "")}</td>
+`;
+  return tr;
+}
+
+function renderAllRows(){
+  const tbody = document.getElementById("results");
+  tbody.innerHTML = "";
+  for(const data of results){
+    if(rowHiddenByFilters(data)) continue;
+    tbody.appendChild(buildRow(data));
+  }
+}
+
+document.getElementById("excludeArabic").addEventListener("change", renderAllRows);
+document.getElementById("onlineOnly").addEventListener("change", renderAllRows);
+
+function getBatchSize(){
+  const v = Number(document.getElementById("batchSize").value);
+  return Number.isFinite(v) && v > 0 ? v : 10;
+}
+
 async function fetchBatch(startId, batchSize){
   const batchResults = [];
   for(let i = 0; i < batchSize; i++){
