@@ -233,123 +233,49 @@ function getIsOnline(user){
   return v === true;
 }
 
-async function fetchAnswer(id){
+async function fetchAnswer(id, retries = 4){
   const target =
     `https://tellonym.me/api/answers/id/${id}?answerId=${id}&username=${encodeURIComponent(USERNAME)}&limit=24`;
 
   const url =
     `${WORKER}?target=${encodeURIComponent(target)}`;
 
-  try{
-    const res = await fetch(url);
-    if(res.status === 404) return null;
-    if(!res.ok) return null;
+  for(let attempt = 0; attempt < retries; attempt++){
+    try{
+      const res = await fetch(url);
 
-    const data = await res.json();
-    if(!data || !data.id) return null;
+      if(res.status === 429){
+        const wait = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s
+        setStatus(`Rate limited on ID ${id} — waiting ${wait/1000}s before retry (attempt ${attempt+1}/${retries})...`);
+        await sleep(wait);
+        continue;
+      }
 
-    return data;
-  }catch{
-    return null;
+      if(res.status === 404 || !res.ok) return null;
+
+      const data = await res.json();
+      if(!data || !data.id) return null;
+
+      return data;
+    }catch{
+      if(attempt < retries - 1) await sleep(1000 * (attempt + 1));
+    }
   }
+  return null;
 }
 
-function avatarCandidates(user){
-  const file = user?.avatarFileName || user?.avatarFilename || "";
-  if(!file) return [];
-  return [
-    `https://userimg.tellonym.me/sm-v2/${file}`,
-    `https://userimg.tellonym.me/lg-v2/${file}`,
-  ];
-}
-
-function rowHiddenByFilters(data){
-  if(document.getElementById("excludeArabic").checked){
-    if(hasArabic(data.tell || "") || hasArabic(data.answer || "")) return true;
-  }
-
-  if(document.getElementById("onlineOnly").checked){
-    if(!getIsOnline(data.user)) return true;
-  }
-
-  return false;
-}
-
-function buildRow(data){
-  const respondent = data.user?.username || "";
-  const profileLink = respondent ? `https://tellonym.me/${respondent}` : "";
-  const isOnline = getIsOnline(data.user);
-
-  const candidates = avatarCandidates(data.user);
-  const avatarURL = candidates[0] || "";
-  const fallbackURL = candidates[1] || "";
-
-  const tr = document.createElement("tr");
-
-  tr.innerHTML = `
-<td>${data.id}</td>
-
-<td>
-  ${
-    avatarURL
-    ? `<a href="${profileLink || '#'}" target="_blank" rel="noopener">
-         <img class="avatar"
-              src="${avatarURL}"
-              onerror="this.onerror=null; this.src='${fallbackURL}'"
-              alt="">
-       </a>`
-    : ""
-  }
-</td>
-
-<td>${escapeHTML(respondent)}</td>
-
-<td>
-  ${
-    profileLink
-    ? `<a href="${profileLink}" target="_blank" rel="noopener">${profileLink}</a>`
-    : ""
-  }
-</td>
-
-<td>
-  <span class="badge">
-    <span class="dot ${isOnline ? "online" : "offline"}"></span>
-    ${isOnline ? "Online" : "Offline"}
-  </span>
-</td>
-
-<td>${escapeHTML(data.createdAt || "")}</td>
-<td>${escapeHTML(data.tell || "")}</td>
-<td>${escapeHTML(data.answer || "")}</td>
-`;
-
-  return tr;
-}
-
-function renderAllRows(){
-  const tbody = document.getElementById("results");
-  tbody.innerHTML = "";
-  for(const data of results){
-    if(rowHiddenByFilters(data)) continue;
-    tbody.appendChild(buildRow(data));
-  }
-}
-
-document.getElementById("excludeArabic").addEventListener("change", renderAllRows);
-document.getElementById("onlineOnly").addEventListener("change", renderAllRows);
-
-function getBatchSize(){
-  const v = Number(document.getElementById("batchSize").value);
-  return Number.isFinite(v) && v > 0 ? v : 10;
-}
-
+// Sequential batch — fires requests one at a time with a small gap.
+// Prevents bursting all IDs at once and triggering Tellonym rate limits.
 async function fetchBatch(startId, batchSize){
-  const ids = Array.from({length: batchSize}, (_,i)=>startId+i);
-  const batch = await Promise.all(ids.map(id => fetchAnswer(id)));
-  return batch.filter(Boolean);
+  const batchResults = [];
+  for(let i = 0; i < batchSize; i++){
+    if(abort) break;
+    const data = await fetchAnswer(startId + i);
+    if(data) batchResults.push(data);
+    if(i < batchSize - 1) await sleep(150); // 150ms stagger within batch
+  }
+  return batchResults;
 }
-
 function setStatus(text){
   document.getElementById("status").innerText = text;
 }
